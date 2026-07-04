@@ -1,0 +1,20 @@
+# Gate: the harness's own fixture specs (tests/) exercise the measurement
+# functions against setContent DOM at phone geometry, plus the TS build compiles.
+# Five apps ride on these functions — a red run here means a real regression.
+name: ci
+on:
+  push:
+    branches: ['**']
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: npm run build

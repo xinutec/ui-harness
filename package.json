@@ -1,0 +1,37 @@
+{
+  "name": "@xinutec/ui-harness",
+  "version": "0.1.0",
+  "description": "Shared phone-width layout checks for the fleet's Angular frontends — render in a real browser at true device geometry and assert about painted pixels, not source.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/ui-harness.d.ts",
+      "default": "./dist/ui-harness.js"
+    }
+  },
+  "types": "./dist/ui-harness.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "playwright test",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.61.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xinutec/ui-harness.git"
+  },
+  "license": "UNLICENSED"
+}
