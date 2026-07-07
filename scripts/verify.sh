@@ -4,7 +4,7 @@
 #
 # Run it the same way everywhere so local-green and CI-green can't diverge:
 #   - by hand:   nix develop -c scripts/verify.sh
-#   - pre-push:  scripts/githooks/pre-push calls it (see scripts/setup-hooks.sh)
+#   - pre-commit:  scripts/githooks/pre-commit calls it (see scripts/setup-hooks.sh)
 #   - CI:        .github/workflows/ci.yml runs the same steps
 #
 # Five Angular frontends ride on this package's measurement functions, so a red
