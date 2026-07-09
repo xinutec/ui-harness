@@ -22,8 +22,11 @@ npm ci
 step "dev-lint (custom static-analysis rules, whole repo)"
 # Pin ?rev= to dev-lint's COMMITTED HEAD so this gate builds its current state,
 # never a dirty worktree — in-flight edits over there can't break this repo's gate.
-dev_lint_rev=$(git -C "$HOME/Code/dev-lint" rev-parse HEAD)
-nix run "git+file://$HOME/Code/dev-lint?rev=$dev_lint_rev" -- .
+dev_lint_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dev-lint"
+[ -d "$dev_lint_dir" ] || dev_lint_dir="$HOME/Code/dev-lint"
+[ -d "$dev_lint_dir" ] || dev_lint_dir="$HOME/code/dev-lint"
+dev_lint_rev=$(git -C "$dev_lint_dir" rev-parse HEAD)
+nix run "git+file://$dev_lint_dir?rev=$dev_lint_rev" -- . # dev-lint
 
 step "tsc build (compiles + emits the published dist/ + .d.ts)"
 # strict + declaration; the thing the apps import is what gets type-checked here.
