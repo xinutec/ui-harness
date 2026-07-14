@@ -68,8 +68,13 @@ test('the suite really runs at phone geometry', async ({ page }) => {
   painted text share pixels. Glyph-level (`Range.getClientRects()`), rects
   clipped to every overflow-clipping ancestor; same-node fragment pairs skipped.
 - `expectNoHorizontalOverflow(page, testInfo, rootSel?, allow?, tol?)` — nothing
-  spills past the right edge; intended horizontal scrollers are an explicit
-  allow-list (computed `overflow-x` is a trap).
+  escapes sideways, on EITHER edge; intended horizontal scrollers are an explicit
+  allow-list (computed `overflow-x` is a trap). The left edge matters more than it
+  sounds: a right-hand spill announces itself by scrolling the page, while content
+  pushed off the left is silent — LTR gives no scroll room left of the origin, so
+  it is simply unreadable, and a right-edge-only check stays green. (This check was
+  right-edge-only until life's wellbeing chart shipped with its axis words off the
+  screen and three passing tests.)
 - `expectNoOccludedControls(page, sels, rootSel?)` — interactive controls aren't
   hidden behind other paint (a FAB sunk under the bottom nav).
 - `expectViewportIsPhone(page, width?)` — the checker-checker: fails loudly if

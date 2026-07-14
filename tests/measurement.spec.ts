@@ -85,6 +85,68 @@ test('detects an element spilling past the viewport', async ({ page }) => {
   expect(res.offenders.length).toBeGreaterThan(0);
 });
 
+test('detects text clipped off the LEFT edge', async ({ page }) => {
+  // The blind spot this check was missing for its whole life. A right-aligned
+  // label in a column that collapsed to zero width lands at a negative x: the
+  // user cannot read it, the page does NOT scroll (browsers give no scroll room
+  // left of the origin in LTR), and a right-edge-only check sees nothing at all.
+  // Found in life's wellbeing chart — three green tests, unreadable axis words.
+  await page.setContent(phonePage(`
+    <div style="display: grid; grid-template-columns: max-content 1fr;">
+      <div style="position: relative;">
+        <span style="position: absolute; right: 0;">energetic</span>
+      </div>
+      <div style="height: 40px;">the plot</div>
+    </div>`));
+  const res = await page.evaluate(findHorizontalOverflow, [null, 1, []] as [
+    string | null,
+    number,
+    string[],
+  ]);
+  expect(res.offenders.length).toBeGreaterThan(0);
+  expect(res.offenders[0].side).toBe('left');
+  expect(res.offenders[0].text).toContain('energetic');
+});
+
+test('an off-canvas drawer (visibility:hidden) is NOT flagged as clipped left', async ({ page }) => {
+  // The false positive that would otherwise land on every app with a sidenav: a
+  // closed drawer sits fully off the left edge BY DESIGN. Material hides it, so
+  // the visibility gate already covers it — pinned here because if that gate ever
+  // moves, five apps start failing on a drawer that is working correctly.
+  await page.setContent(phonePage(`
+    <nav style="position: absolute; left: -280px; top: 0; width: 280px; height: 100%;
+                visibility: hidden;">
+      <a href="#">closed drawer link</a>
+    </nav>
+    <main style="height: 40px;">the page</main>`));
+  const res = await page.evaluate(findHorizontalOverflow, [null, 1, []] as [
+    string | null,
+    number,
+    string[],
+  ]);
+  expect(res.offenders).toEqual([]);
+});
+
+test('the allow-list exempts a left-clipped child of an intended scroller', async ({ page }) => {
+  // A horizontal carousel scrolled forward has its first slide off to the left.
+  // That is the scroller doing its job — the same allow-list that exempts the
+  // right-hand spill must exempt this, or every carousel trips the new check.
+  await page.setContent(phonePage(`
+    <div class="carousel" style="overflow-x: auto; width: 200px;">
+      <div style="display: flex; width: 700px;">
+        <div style="width: 350px; height: 40px;">slide one</div>
+        <div style="width: 350px; height: 40px;">slide two</div>
+      </div>
+    </div>
+    <script>document.querySelector('.carousel').scrollLeft = 300;</script>`));
+  const res = await page.evaluate(findHorizontalOverflow, [null, 1, ['.carousel']] as [
+    string | null,
+    number,
+    string[],
+  ]);
+  expect(res.offenders).toEqual([]);
+});
+
 test('a vertical scroller does NOT exempt its overflowing children', async ({ page }) => {
   // The computed-style trap: overflow-y:auto forces overflow-x to compute
   // auto, which used to exempt the whole subtree. The 700px child inside a

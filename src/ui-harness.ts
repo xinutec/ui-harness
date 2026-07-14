@@ -175,8 +175,12 @@ export async function expectNoTextOverlaps(
 export interface Overflower {
 	sel: string;
 	text: string;
-	/** How far past the right edge it reaches, in px. */
+	/** How far past that edge it reaches, in px (always positive). */
 	spill: number;
+	/** Which edge it escapes. The two fail differently: `right` usually shows up as
+	 *  a sideways page scroll, while `left` is SILENT — there is no scroll room left
+	 *  of the origin in LTR, so the content is simply unreachable. */
+	side: "left" | "right";
 }
 
 /**
@@ -212,6 +216,12 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 	// exactly when there's something to catch. clientWidth stays the true
 	// viewport. (Found by this package's own fixture specs.)
 	const rightEdge = rootSel ? rootRect.right : document.documentElement.clientWidth;
+	// The other edge. A right-hand spill announces itself (the page scrolls
+	// sideways); escaping LEFT does not — LTR gives no scroll room left of the
+	// origin, so the content is just gone, unreadable and unreachable, while every
+	// right-edge check stays green. That is exactly how life's wellbeing chart
+	// shipped with axis words off the screen and three passing tests.
+	const leftEdge = rootSel ? rootRect.left : 0;
 
 	const inAllowedScroller = (el: Element): boolean =>
 		allow.some((sel) => el.closest(sel) !== null);
@@ -247,15 +257,21 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 		if (inAllowedScroller(el)) continue;
 		const r = el.getBoundingClientRect();
 		if (r.width < 1 || r.height < 1) continue;
-		const spill = r.right - rightEdge;
+		// Both edges. An element can only escape one of them at a phone width
+		// without being wider than the screen — and if it IS wider, the right-hand
+		// spill is the one that names the cause, so it wins the tie.
+		const overRight = r.right - rightEdge;
+		const overLeft = leftEdge - r.left;
+		const [spill, side]: [number, "left" | "right"] =
+			overRight > tol ? [overRight, "right"] : [overLeft, "left"];
 		if (spill <= tol) continue;
 		const sel = describe(el);
-		// One row per (selector, rounded-spill) so a stack of nested offenders
+		// One row per (selector, side, rounded-spill) so a stack of nested offenders
 		// that all spill by the same amount collapses to its outermost note.
-		const key = `${sel}@${Math.round(spill)}`;
+		const key = `${sel}@${side}@${Math.round(spill)}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
-		offenders.push({ sel, text: (el.textContent ?? "").trim().slice(0, 40), spill });
+		offenders.push({ sel, text: (el.textContent ?? "").trim().slice(0, 40), spill, side });
 	}
 	offenders.sort((a, b) => b.spill - a.spill);
 
@@ -290,9 +306,22 @@ export async function expectNoHorizontalOverflow(
 	]);
 	if (offenders.length === 0) return;
 	const detail = offenders
-		.map((o) => `  ${o.sel} — spills ${o.spill.toFixed(1)}px${o.text ? ` — "${o.text}"` : ""}`)
+		.map(
+			(o) =>
+				`  ${o.sel} — ${o.side === "left" ? "clipped OFF the left edge by" : "spills past the right edge by"} ` +
+				`${o.spill.toFixed(1)}px${o.text ? ` — "${o.text}"` : ""}`,
+		)
 		.join("\n");
-	throw new LayoutError(`Horizontal overflow at phone width (${offenders.length}):\n${detail}`);
+	const clipped = offenders.filter((o) => o.side === "left").length;
+	// Name the silent failure explicitly: a right-hand spill is visible (the page
+	// scrolls), while content off the left edge is simply unreadable and leaves no
+	// trace for any other check to find.
+	const hint = clipped
+		? `\n${clipped} of these are off the LEFT edge — unreachable, and they cause no page scroll to give them away.`
+		: "";
+	throw new LayoutError(
+		`Content outside the viewport at phone width (${offenders.length}):\n${detail}${hint}`,
+	);
 }
 
 /** An interactive control hidden behind another painted element at its centre. */
