@@ -171,6 +171,125 @@ export async function expectNoTextOverlaps(
 	throw new LayoutError(`Text overlaps detected (${overlaps.length}):\n${detail}`);
 }
 
+/** A line of text whose top or bottom edge is sheared off by an ancestor. */
+export interface ClippedText {
+	text: string;
+	/** Which edge is cut — a floating field label sheared at the top is `top`. */
+	edge: "top" | "bottom";
+	clippedPx: number;
+	/** The clipping ancestor (tag + leading classes). */
+	by: string;
+}
+
+/**
+ * Runs in the browser. The failure class neither overlap nor overflow can see:
+ * visible text whose TOP or BOTTOM is sheared off by an overflow-clipping
+ * ancestor and **cannot be scrolled back into view** — the "label cut in half"
+ * bug (life's Find-on-Waitrose "Search" label, halved by `mat-dialog-content`'s
+ * zeroed top padding). Deliberately the inverse of the clip-to-ancestor logic in
+ * findTextOverlaps: there, paint-clipped text is discarded so it can't collide;
+ * here, that same clipping IS the defect when it eats a live glyph for good.
+ *
+ * The scroll test is what keeps it honest: text off the top of a scroller you've
+ * scrolled down past is transient (scroll up and it's back) — only a clip in a
+ * direction the container CAN'T scroll is a permanent shear. An `overflow:hidden`
+ * box never scrolls, so any partial clip there is permanent. Normal padded
+ * content never trips it: the first line box sits at the padding edge, INSIDE the
+ * ancestor box, so there's nothing above to cut.
+ *
+ * `args` is [rootSel, minPx]: scope to a container (an open dialog), and ignore
+ * shears under `minPx` (sub-pixel line-leading, antialiasing). Horizontal clips
+ * are out of scope — that's findHorizontalOverflow (and legit ellipsis).
+ */
+export function findClippedText(args: [string | null, number]): ClippedText[] {
+	const [rootSel, minPx] = args;
+	const root = rootSel ? document.querySelector(rootSel) : document.body;
+	if (!root) return [];
+	const describe = (el: Element): string => {
+		const cls =
+			typeof el.className === "string" && el.className.trim()
+				? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+				: "";
+		return el.tagName.toLowerCase() + cls;
+	};
+	const out: ClippedText[] = [];
+	const seen = new Set<string>();
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+	let nodeIdx = 0;
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+		const text = (node.textContent ?? "").trim();
+		if (!text) continue;
+		const parent = node.parentElement;
+		if (!parent) continue;
+		// Icon-font ligatures paint a single glyph, not readable text (same skip as
+		// the overlap check) — an icon straddling a clip edge isn't a sheared word.
+		if (parent.closest("mat-icon, .material-icons, .material-symbols-outlined, .material-symbols-rounded")) continue;
+		const st = getComputedStyle(parent);
+		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		nodeIdx++;
+		const range = document.createRange();
+		range.selectNodeContents(node);
+		for (const r of Array.from(range.getClientRects())) {
+			if (r.height < 1) continue;
+			// Walk clipping ancestors — element only, stopping before body/html: the
+			// viewport "clips" everything below the fold, but that's page scroll, not
+			// a shear.
+			for (
+				let p: Element | null = parent;
+				p && p !== document.body && p !== document.documentElement;
+				p = p.parentElement
+			) {
+				const ps = getComputedStyle(p);
+				if (ps.overflowY === "visible") continue; // this ancestor doesn't clip vertically
+				const pb = p.getBoundingClientRect();
+				const el = p as HTMLElement;
+				// Only `auto`/`scroll` can actually be scrolled back to reveal the clip.
+				// `overflow: hidden`/`clip` report scrollHeight > clientHeight but the
+				// user can't move them — a partial clip there is permanent.
+				const scrollableY = ps.overflowY === "auto" || ps.overflowY === "scroll";
+				const canScrollUp = scrollableY && el.scrollTop > 1;
+				const canScrollDown = scrollableY && el.scrollTop < el.scrollHeight - el.clientHeight - 1;
+				// How much of the line still shows inside this ancestor; a line fully
+				// outside is hidden/off-screen, a different concern than a half-cut one.
+				const visible = Math.min(r.bottom, pb.bottom) - Math.max(r.top, pb.top);
+				if (visible < minPx) continue;
+				const topClip = pb.top - r.top; // >0 → line rises above the ancestor's top
+				const botClip = r.bottom - pb.bottom; // >0 → line drops below the bottom
+				const flag = (edge: "top" | "bottom", clip: number): void => {
+					const key = `${nodeIdx}:${edge}`;
+					if (seen.has(key)) return;
+					seen.add(key);
+					out.push({ text, edge, clippedPx: Math.round(clip * 10) / 10, by: describe(p as Element) });
+				};
+				if (topClip > minPx && !canScrollUp) flag("top", topClip);
+				if (botClip > minPx && !canScrollDown) flag("bottom", botClip);
+			}
+		}
+	}
+	return out;
+}
+
+/**
+ * Assert no visible text is permanently sheared by a clipping ancestor. `rootSel`
+ * scopes to a container (an open dialog); `minPx` is the shear ignored as
+ * sub-pixel noise. Leaves the same screenshot artifact as the other checks.
+ */
+export async function expectNoClippedText(
+	page: Page,
+	testInfo: TestInfo,
+	rootSel: string | null = null,
+	minPx = 3,
+): Promise<void> {
+	await leaveSnapshot(page, testInfo);
+
+	const clips = await page.evaluate(findClippedText, [rootSel, minPx] as [string | null, number]);
+	if (clips.length === 0) return;
+	const detail = clips
+		.map((c) => `  "${c.text}" — ${c.clippedPx}px off the ${c.edge}, sheared by ${c.by} (can't scroll to it)`)
+		.join("\n");
+	throw new LayoutError(`Text clipped by an overflow edge (${clips.length}):\n${detail}`);
+}
+
 /** An element whose right edge spills past the viewport (or the given root). */
 export interface Overflower {
 	sel: string;

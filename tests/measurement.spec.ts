@@ -3,6 +3,7 @@ import {
   findTextOverlaps,
   findHorizontalOverflow,
   findOccludedControls,
+  findClippedText,
   expectViewportIsPhone,
   swipeUp,
 } from '../src/ui-harness';
@@ -72,6 +73,50 @@ test('a badge sitting on an icon glyph is NOT a collision', async ({ page }) => 
     </div>`));
   const pairs = await page.evaluate(findTextOverlaps, [null, 1.5] as [string | null, number]);
   expect(pairs).toEqual([]);
+});
+
+test('detects a label sheared at the top of a zero-top-padding scroll box', async ({ page }) => {
+  // The Find-on-Waitrose shape: an overflow scroll box with no top padding, whose
+  // first bit of text is pushed above the box top (a floating outline label sits
+  // on the field's top border). It can't scroll up, so the top of the word is
+  // gone for good — the exact bug three green suites never caught.
+  await page.setContent(phonePage(`
+    <div style="overflow-y: auto; max-height: 100px; width: 200px; padding-top: 0; font: 16px sans-serif;">
+      <span style="position: relative; top: -9px;">Search</span>
+      <div style="height: 30px;">body</div>
+    </div>`));
+  const clips = await page.evaluate(findClippedText, [null, 3] as [string | null, number]);
+  expect(clips.map((c) => [c.text, c.edge])).toEqual([['Search', 'top']]);
+});
+
+test('detects text sheared at the bottom of an overflow:hidden box too small for it', async ({ page }) => {
+  await page.setContent(phonePage(`
+    <div style="overflow: hidden; height: 9px; font: 16px sans-serif;">Chopped</div>`));
+  const clips = await page.evaluate(findClippedText, [null, 3] as [string | null, number]);
+  expect(clips.map((c) => c.edge)).toEqual(['bottom']);
+});
+
+test('does NOT flag text scrolled out of a scroller — it can be scrolled back', async ({ page }) => {
+  // Content off the top and bottom of a mid-scroll list is transient, not sheared:
+  // scrolling reveals it. Only a clip in a direction the box can't scroll counts.
+  await page.setContent(phonePage(`
+    <div id="s" style="overflow-y: auto; height: 40px; font: 16px sans-serif;">
+      <p>one</p><p>two</p><p>three</p><p>four</p><p>five</p></div>`));
+  await page.evaluate(() => {
+    const s = document.getElementById('s')!;
+    s.scrollTop = Math.floor((s.scrollHeight - s.clientHeight) / 2);
+  });
+  const clips = await page.evaluate(findClippedText, [null, 3] as [string | null, number]);
+  expect(clips).toEqual([]);
+});
+
+test('does NOT flag normal padded content at the top of a scroll box', async ({ page }) => {
+  // The first line sits at the padding edge, inside the box — nothing above to cut.
+  await page.setContent(phonePage(`
+    <div style="overflow-y: auto; max-height: 100px; padding: 12px; font: 16px sans-serif;">
+      <span>Search</span></div>`));
+  const clips = await page.evaluate(findClippedText, [null, 3] as [string | null, number]);
+  expect(clips).toEqual([]);
 });
 
 test('detects an element spilling past the viewport', async ({ page }) => {
