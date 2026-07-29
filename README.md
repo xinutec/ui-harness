@@ -81,6 +81,21 @@ test('the suite really runs at phone geometry', async ({ page }) => {
   device emulation ever silently drops.
 - `expectIconFontLoaded(page, family?)` — the icon font actually loaded (no
   tofu boxes for Material Icons).
+- `expectCanvasLegible(page, testInfo, sel?, minRatio?, minPainted?)` — a
+  canvas's marks are actually visible against the page behind them. Canvas is
+  the one place the stylesheet does not reach: an unparseable colour assigned to
+  `fillStyle` is ignored **in silence**, leaving the previous value (black, on a
+  fresh context). Material's system tokens compute to `light-dark(#…, #…)`,
+  which no canvas can parse, so passing one straight through paints black on a
+  dark background with nothing anywhere reporting a problem — and nothing else
+  here can see it, since the layout checks measure geometry, unit tests never
+  rasterise, and the page stays valid. Solidly-painted pixels only (alpha > 200),
+  scored against the nearest **opaque ancestor** rather than `document.body`,
+  which several fleet apps leave transparent. Call it under
+  `page.emulateMedia({ colorScheme })` for BOTH schemes — the classic form of
+  this bug is invisible in light mode. It catches marks that are *illegible*,
+  not merely *wrong-coloured*; dev-lint's `DL-CANVAS-SYSTEM-TOKEN` covers the
+  known cause statically.
 - `swipeUp(page, opts?)` — a real CDP touch flick, not a `scrollTop` shortcut.
 - `expectReachableByScroll(page, locator, scrollerSel)` — swipe until the target
   is on-screen; fails if a nested-scroller fight keeps it unreachable.
