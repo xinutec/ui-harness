@@ -650,3 +650,140 @@ export async function expectReachableByScroll(
 		);
 	}
 }
+
+/** What a single canvas painted, and how legible it is against the page. */
+export interface CanvasContrast {
+	/** 0-based index among the canvases the selector matched. */
+	index: number;
+	/** Count of solidly-painted pixels (alpha > 200). */
+	painted: number;
+	/** Contrast of the brightest marks (90th percentile) against the backdrop. */
+	ratio: number;
+	/** The backdrop the marks were measured against, as rgb(). */
+	backdrop: string;
+}
+
+/**
+ * Measure, in the browser, how legible each canvas's marks are.
+ *
+ * Split out from the assertion so a spec can inspect the numbers, matching the
+ * `findX` / `expectNoX` pairing the rest of this module uses.
+ */
+export function findCanvasContrast([selector, minAlpha]: [string, number]): CanvasContrast[] {
+	const luminance = (r: number, g: number, b: number): number => {
+		const channel = (v: number): number => {
+			const s = v / 255;
+			return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+		};
+		return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+	};
+	const parse = (css: string): [number, number, number] | null => {
+		const n = css.match(/[\d.]+/g)?.map(Number);
+		if (!n || n.length < 3) return null;
+		// A fully transparent colour tells us nothing about what shows through.
+		if (n.length > 3 && n[3] === 0) return null;
+		return [n[0], n[1], n[2]];
+	};
+	/** The first opaque background painted behind `el` — NOT document.body,
+	 *  which is transparent in several fleet apps and would score every mark
+	 *  against black regardless of the real page colour. */
+	const backdropOf = (el: Element): [number, number, number] => {
+		for (let node: Element | null = el; node; node = node.parentElement) {
+			const rgb = parse(getComputedStyle(node).backgroundColor);
+			if (rgb) return rgb;
+		}
+		const root = parse(getComputedStyle(document.documentElement).backgroundColor);
+		return root ?? [255, 255, 255];
+	};
+
+	const out: CanvasContrast[] = [];
+	document.querySelectorAll(selector).forEach((el, index) => {
+		if (!(el instanceof HTMLCanvasElement)) return;
+		// A WebGL/2D-less canvas yields no 2D context; nothing to measure rather
+		// than a failure to report.
+		const ctx = el.getContext("2d");
+		if (!ctx || el.width === 0 || el.height === 0) return;
+		let data: Uint8ClampedArray;
+		try {
+			data = ctx.getImageData(0, 0, el.width, el.height).data;
+		} catch {
+			return; // tainted canvas — unreadable, not illegible
+		}
+		const [br, bg, bb] = backdropOf(el);
+		const back = luminance(br, bg, bb);
+		const ratios: number[] = [];
+		for (let i = 0; i < data.length; i += 4) {
+			// Solidly painted pixels only — antialiased glyph edges and
+			// deliberately faint strokes blend toward the backdrop by design and
+			// would drag the measurement down.
+			if (data[i + 3] < minAlpha) continue;
+			const l = luminance(data[i], data[i + 1], data[i + 2]);
+			const [hi, lo] = l > back ? [l, back] : [back, l];
+			ratios.push((hi + 0.05) / (lo + 0.05));
+		}
+		ratios.sort((a, b) => a - b);
+		out.push({
+			index,
+			painted: ratios.length,
+			ratio: ratios.length ? ratios[Math.floor(ratios.length * 0.9)] : 0,
+			backdrop: `rgb(${br}, ${bg}, ${bb})`,
+		});
+	});
+	return out;
+}
+
+/**
+ * Assert every canvas on the page painted marks that are actually visible
+ * against the page behind them.
+ *
+ * Canvas is the one place in an Angular app where the stylesheet does not
+ * reach: `ctx.fillStyle = <unparseable>` is ignored IN SILENCE, leaving the
+ * previous colour (black, on a fresh context). Material's system tokens compute
+ * to `light-dark(#1d1b1e, #e6e1e6)` — a CSS function no canvas can parse — so
+ * handing one straight through paints black on a dark background with nothing
+ * anywhere reporting a problem. dev-lint's DL-CANVAS-SYSTEM-TOKEN catches the
+ * known shape statically; this catches the CLASS, whatever produced it.
+ *
+ * Nothing else sees it: the layout checks measure geometry, unit tests never
+ * rasterise, and the page is perfectly valid. So this reads the pixels.
+ *
+ * Call it under `page.emulateMedia({ colorScheme })` for BOTH schemes — the
+ * classic form of this bug is invisible in light mode.
+ */
+export async function expectCanvasLegible(
+	page: Page,
+	testInfo: TestInfo,
+	selector = "canvas",
+	minRatio = 3,
+	minPainted = 200,
+): Promise<void> {
+	await leaveSnapshot(page, testInfo);
+
+	const measured = await page.evaluate(findCanvasContrast, [selector, 200] as [string, number]);
+	if (measured.length === 0) {
+		throw new LayoutError(`no readable 2D canvas matched ${selector} — nothing was measured`);
+	}
+	const blank = measured.filter((c) => c.painted < minPainted);
+	if (blank.length > 0) {
+		const detail = blank.map((c) => `  ${selector}[${c.index}] — ${c.painted} solid px`).join("\n");
+		throw new LayoutError(
+			`Canvas painted (almost) nothing, so legibility cannot be judged ` +
+				`(want > ${minPainted} solid px):\n${detail}\n` +
+				`  If the canvas draws asynchronously, await its first frame before asserting.`,
+		);
+	}
+	const faint = measured.filter((c) => c.ratio < minRatio);
+	if (faint.length === 0) return;
+	const detail = faint
+		.map(
+			(c) =>
+				`  ${selector}[${c.index}] — brightest marks reach only ${c.ratio.toFixed(1)}:1 ` +
+				`against ${c.backdrop} (${c.painted} solid px)`,
+		)
+		.join("\n");
+	throw new LayoutError(
+		`Canvas marks are illegible against the page (want ≥ ${minRatio}:1):\n${detail}\n` +
+			`  A Material system token assigned to fillStyle is the usual cause — it computes to\n` +
+			`  light-dark(...), canvas cannot parse it, and the assignment is silently ignored.`,
+	);
+}

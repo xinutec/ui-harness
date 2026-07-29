@@ -4,6 +4,7 @@ import {
   findHorizontalOverflow,
   findOccludedControls,
   findClippedText,
+  findCanvasContrast,
   expectViewportIsPhone,
   swipeUp,
 } from '../src/ui-harness';
@@ -293,4 +294,70 @@ test('a pointer-events:none overlay does not count as occluding', async ({ page 
     <div style="position: fixed; inset: 0; z-index: 99; pointer-events: none;"></div>`));
   const occ = await page.evaluate(findOccludedControls, ['button', []] as [string, string[]]);
   expect(occ).toEqual([]);
+});
+
+/**
+ * Canvas legibility. These fixtures paint a canvas by hand rather than loading
+ * an app, so they exercise the measurement itself: the whole point is that this
+ * is the ONLY check that can see an unparseable colour, since the page stays
+ * valid and the geometry stays correct.
+ */
+const canvasPage = (script: string, bodyStyle = 'background:#111'): string =>
+  phonePage(
+    `<div id="wrap" style="${bodyStyle}">
+       <canvas id="c" width="200" height="100"></canvas>
+     </div>
+     <script>
+       const ctx = document.getElementById('c').getContext('2d');
+       ${script}
+     </script>`,
+  );
+
+test('flags marks that are invisible against the page behind them', async ({ page }) => {
+  // The exact production failure: a Material token reaches fillStyle, canvas
+  // cannot parse it, the assignment is ignored, and the default black paints
+  // onto a dark surface. Valid page, correct layout, invisible content.
+  await page.setContent(
+    canvasPage(`
+      ctx.fillStyle = 'light-dark(#1d1b1e, #e6e1e6)';
+      ctx.fillRect(10, 10, 180, 80);
+    `),
+  );
+  const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
+  expect(measured).toHaveLength(1);
+  expect(measured[0].painted).toBeGreaterThan(200);
+  expect(measured[0].ratio).toBeLessThan(3);
+});
+
+test('passes marks that contrast with the page', async ({ page }) => {
+  await page.setContent(
+    canvasPage(`
+      ctx.fillStyle = 'rgb(230, 225, 230)';
+      ctx.fillRect(10, 10, 180, 80);
+    `),
+  );
+  const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
+  expect(measured[0].ratio).toBeGreaterThan(3);
+});
+
+test('measures against the nearest opaque ancestor, not a transparent body', async ({ page }) => {
+  // Several fleet apps leave body transparent and paint the surface on a
+  // wrapper. Scoring against document.body would treat that as black and pass
+  // black-on-white marks — the exact bug this exists to catch, inverted.
+  await page.setContent(
+    canvasPage(
+      `ctx.fillStyle = 'rgb(20, 20, 20)';
+       ctx.fillRect(10, 10, 180, 80);`,
+      'background:#ffffff',
+    ),
+  );
+  const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
+  expect(measured[0].backdrop).toBe('rgb(255, 255, 255)');
+  expect(measured[0].ratio).toBeGreaterThan(3);
+});
+
+test('reports an unpainted canvas rather than scoring it', async ({ page }) => {
+  await page.setContent(canvasPage(''));
+  const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
+  expect(measured[0].painted).toBe(0);
 });
