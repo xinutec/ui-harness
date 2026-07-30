@@ -45,13 +45,59 @@ In a Docker build on `node:alpine`, add git so `npm ci` can clone the dep:
 import { expectNoTextOverlaps, expectNoHorizontalOverflow, expectViewportIsPhone } from '@xinutec/ui-harness';
 ```
 
-Config convention (the viewport MUST live in the project `use`, not the global
-one — a device spread carries its own viewport and project-level `use` overrides
-global; that exact mistake ran life's "phone" tests at desktop width for months):
+## The config and the server
+
+An app no longer writes a Playwright config; it says what it *is* and gets one.
+
+```js
+// frontend/e2e/harness.mjs — the app-specific half, read by BOTH the config
+// and the static server, so they cannot disagree.
+/** @type {import('@xinutec/ui-harness/config').HarnessSpec} */
+export default {
+  app: 'life',                      // must be in the APPS table (it IS the port)
+  dist: 'dist/life-web/browser',    // the built bundle to serve
+  api: { '/api/me': { userId: 'test' } },  // fallback for unrouted /api/ calls
+};
+```
 
 ```ts
-projects: [{ name: 'chromium', use: { ...devices['Pixel 7'], deviceScaleFactor: 1 } }],
+// frontend/playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+import { phoneConfig } from '@xinutec/ui-harness/config';
+import harness from './e2e/harness.mjs';
+
+export default defineConfig(phoneConfig(harness, devices, { goldens: true }));
 ```
+
+**The port is an allocation, so it is allocated.** `APPS` in `src/config.ts` is
+an ordered list and a port is an index into it — two apps cannot share one, and
+an app the list does not name gets a loud error rather than a number someone
+guessed. This replaces two fleet lint rules that read eleven hand-written
+configs looking for collisions after the fact. They found real ones: recall and
+utterance both on 4293 (recall's suite went 8/8 pass to 8/8 fail purely by
+running at the same time), health and memview both on 4273, and three servers
+that defaulted to the port of the app they had been copied from.
+
+`devices` is passed **in** rather than imported here. That keeps this module
+free of a runtime `@playwright/test` (see above), and it means an app hands over
+its device table without getting to choose from it — `devices['Desktop Chrome']`
+in a phone-width suite is not expressible. For the same reason `HarnessOptions`
+has no `use` or `projects`: overriding those *is* the failure, so it is a type
+error rather than a convention. What an app may still set: `testMatch`,
+`timeout`, `goldens`.
+
+`webServer.command` is generated and runs `dist/serve.js`, the fleet's one
+static server for a production bundle — SPA fallback, the content types the
+service worker needs, containment above the bundle, and the `/api/` stub from
+the spec. To serve a build by hand, from `frontend/`:
+
+```sh
+node node_modules/@xinutec/ui-harness/dist/serve.js   # no arguments: the spec has them
+```
+
+An app that serves its own bundle (thoth's Swift binary is the thing under test)
+sets `server: { command: (port) => …, cwd, host, reuseExistingServer }` and still
+takes the allocated port.
 
 Every app's suite includes one viewport self-guard spec:
 
@@ -102,8 +148,15 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 
 ## Developing the harness
 
-`npm ci && npm test` runs the package's own fixture specs (`page.setContent` DOM
-fixtures — no app server): ellipsis-phantom, clip-model and icon-glyph-vs-badge
-false positives, real overlap/overflow detection, the allow-list. `npm run build`
-compiles `src/` → `dist/`. Seven frontends consume this (coach, home, life,
-messages, health, fleetwatch + thoth) — run both after any change.
+`npm ci && npm test` runs the package's own specs. Three kinds:
+`tests/measurement.spec.ts` — `page.setContent` DOM fixtures for the layout
+checks (ellipsis-phantom, clip-model and icon-glyph-vs-badge false positives,
+real overlap/overflow detection, the allow-list); `tests/config.spec.ts` — the
+port allocation and the shape of the config it hands out; `tests/serve.spec.ts`
+— the static server against a real bundle-shaped directory. `npm run build`
+compiles `src/` → `dist/`.
+
+Twelve frontends consume this (coach, fleetwatch, gamepads, health, home, life,
+memview, messages, observe, recall, thoth, utterance) and all of them now take
+their config from it, so a change here lands everywhere at once — run their
+`ui-check` after anything that touches `config.ts` or `serve.ts`.

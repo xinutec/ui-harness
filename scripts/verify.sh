@@ -7,8 +7,10 @@
 #   - pre-commit:  scripts/githooks/pre-commit calls it (see scripts/setup-hooks.sh)
 #   - CI:        .github/workflows/ci.yml runs the same steps
 #
-# Five Angular frontends ride on this package's measurement functions, so a red
-# run here is a real regression in the shared harness. Steps run cheapest-first.
+# Twelve Angular frontends ride on this package — on its measurement functions
+# and, since the config was modelled here, on their Playwright config and static
+# server too. A red run here is a real regression in every one of them. Steps
+# run cheapest-first.
 set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
