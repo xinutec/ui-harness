@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "test": "playwright test",
     "prepare": "npm run build"
   },

@@ -34,6 +34,13 @@ step "tsc build (compiles + emits the published dist/ + .d.ts)"
 # strict + declaration; the thing the apps import is what gets type-checked here.
 npm run build
 
+step "tsc typecheck of scripts/ (noEmit)"
+# scripts/ is real code and gets the same treatment as src/. It is not covered by
+# the build above (rootDir is src/), and it used to be shell — where this fleet has
+# no gate at all, and where bump-consumers shipped a silent substitution bug that
+# rewrote a lockfile without its manifest.
+npm run typecheck:scripts
+
 step "playwright fixture specs (measurement fns @ phone geometry)"
 # The specs in tests/ exercise the measurement functions against setContent DOM at
 # the same Pixel-7 geometry the real checks run at — no app, no server. Chromium
