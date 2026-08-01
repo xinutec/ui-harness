@@ -32,11 +32,12 @@ import androidx.core.view.WindowInsetsCompat
  * WebView in one wrapper, no Compose, no AppCompat. A subclass declares its
  * [ShellConfig] and, if it needs anything beyond a viewer, overrides a hook.
  *
- * This exists because seven apps each kept their own copy of it, and copies drift:
- * by the time it was extracted, `parseCssColor` was byte-identical in all seven,
- * `Restore` existed five times, and back-press had already split into two idioms —
- * three apps on the modern dispatcher, four still overriding the deprecated
- * `onBackPressed`, which is a *behavioural* difference on API 33+.
+ * This exists because eight apps each kept their own copy of it, and copies drift:
+ * by the time it was extracted, `parseCssColor` was byte-identical in all eight,
+ * `Restore` existed five times under two different implementations, back-press had
+ * split into two idioms — three apps on the modern dispatcher, five still overriding
+ * the deprecated `onBackPressed`, a *behavioural* difference on API 33+ — and one
+ * copy had lost `Type.ime()` from its insets, so its keyboard drew over the page.
  *
  * ## What the shell owns
  *
@@ -155,7 +156,7 @@ abstract class WebShellActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, backCallback)
         // An intent may name the page to open (a tapped notification); otherwise
         // reopen where we left off. The configured URL is only the first-run default.
-        web.loadUrl(startUrl(intent) ?: prefs.getString(KEY_LAST_URL, null) ?: shell.url)
+        web.loadUrl(startUrl(intent) ?: restorePoint() ?: shell.url)
     }
 
     /**
@@ -176,6 +177,18 @@ abstract class WebShellActivity : ComponentActivity() {
         web.destroy()
         super.onDestroy()
     }
+
+    /**
+     * The page a cold launch reopens on, or null to use [ShellConfig.url].
+     *
+     * Re-checked against the *current* configured URL rather than trusted: a point
+     * saved before the app was repointed at another host would otherwise pin every
+     * launch to the old one, which no amount of restarting could clear. Same test
+     * as on the way in, so a restore point written by an older build that predates
+     * the login-hop filter is dropped rather than replayed.
+     */
+    private fun restorePoint(): String? =
+        prefs.getString(KEY_LAST_URL, null)?.takeIf { Restore.isRestorable(shell.url, it) }
 
     // ---- hooks ----
 
@@ -235,10 +248,8 @@ abstract class WebShellActivity : ComponentActivity() {
             view: WebView,
             request: WebResourceRequest,
         ): Boolean {
-            val allowed = shell.allowedHosts
-            if (allowed.isEmpty()) return false // no confinement configured
             val url = request.url
-            if (url.scheme == "https" && url.host in allowed) return false // in-app
+            if (staysInApp(shell.url, shell.allowedHosts, url.scheme, url.host)) return false
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, url))
             } catch (_: ActivityNotFoundException) {

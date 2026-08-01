@@ -3,14 +3,14 @@
 # The single source of truth for "is this change good?" for @xinutec/ui-harness.
 #
 # Run it the same way everywhere so local-green and CI-green can't diverge:
-#   - by hand:   nix develop -c scripts/verify.sh
+#   - by hand:   scripts/verify.sh
 #   - pre-commit:  scripts/githooks/pre-commit calls it (see scripts/setup-hooks.sh)
 #   - CI:        .github/workflows/ci.yml runs the node steps only — no Android SDK
 #                on the runner, and nothing in the fleet builds Android in CI
 #
 # Twelve Angular frontends ride on this package — on its measurement functions
 # and, since the config was modelled here, on their Playwright config and static
-# server too — and seven Android wrappers ride on android/. A red run here is a
+# server too — and eight Android wrappers ride on android/. A red run here is a
 # real regression in every one of them. Steps run cheapest-first, so the Android
 # half (a JVM, an SDK and a full APK) comes last.
 set -euo pipefail
@@ -19,9 +19,16 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 step() { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 
+# Each step names the dev shell it needs, so this script runs the same way whether
+# or not you are already inside one. The halves have different toolchains (node vs
+# JDK+SDK+ktlint) and a step that silently borrowed the wrong one is exactly the
+# kind of local-green/CI-red gap this file exists to prevent.
+web() { nix develop .#default --command "$@"; }
+android() { nix develop .#android --command "$@"; }
+
 step "npm ci (clean install from the lockfile)"
 # Deterministic install: fails if package.json and package-lock.json disagree.
-npm ci
+web npm ci
 
 step "dev-lint (custom static-analysis rules, whole repo)"
 # Pin ?rev= to dev-lint's COMMITTED HEAD so this gate builds its current state,
@@ -34,27 +41,23 @@ nix run "git+file://$dev_lint_dir?rev=$dev_lint_rev" -- . # dev-lint
 
 step "tsc build (compiles + emits the published dist/ + .d.ts)"
 # strict + declaration; the thing the apps import is what gets type-checked here.
-npm run build
+web npm run build
 
 step "tsc typecheck of scripts/ (noEmit)"
 # scripts/ is real code and gets the same treatment as src/. It is not covered by
 # the build above (rootDir is src/), and it used to be shell — where this fleet has
 # no gate at all, and where bump-consumers shipped a silent substitution bug that
 # rewrote a lockfile without its manifest.
-npm run typecheck:scripts
+web npm run typecheck:scripts
 
 step "playwright fixture specs (measurement fns @ phone geometry)"
 # The specs in tests/ exercise the measurement functions against setContent DOM at
 # the same Pixel-7 geometry the real checks run at — no app, no server. Chromium
 # comes from playwright's own cache; install is idempotent (fast when present).
-npx playwright install chromium
-npm test
+web npx playwright install chromium
+web npm test
 
 # ---- the Android half ----
-#
-# Its toolchain (JDK, SDK, ktlint) is a different dev shell, so each step enters
-# it. Nested `nix develop` is fine; the outer one only carries node.
-android() { nix develop .#android --command "$@"; }
 
 step "ktlint (android/)"
 # dev-lint's DL-KTLINT discovers apps by <module>/app/src/main/AndroidManifest.xml,
@@ -63,14 +66,14 @@ step "ktlint (android/)"
 android ktlint "android/main/src/**/*.kt" "android/*.kts"
 
 step "shell unit tests (org.xinutec:shell)"
-# Restore's predicate and the CSS-colour parse — the two pieces of the shell that
-# can be wrong without anything crashing.
+# Restore's predicate, host confinement, and the CSS-colour parse — the pieces of
+# the shell that can be wrong without anything crashing.
 android ./android/gradlew -p android --console=plain :main:test
 
 step "life built against the shell (the demanding consumer)"
 # The API was designed against life, so life is what proves it still fits. Building
 # it exercises the composite substitution end to end, and puts a breaking change in
-# the repo that caused it rather than in seven apps at once.
+# the repo that caused it rather than in eight apps at once.
 life_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/life"
 [ -d "$life_dir" ] || life_dir="$HOME/Code/life"
 if [ -d "$life_dir/android" ]; then

@@ -12,7 +12,7 @@ Two halves, one repo:
 
 They share a repo because they are the same job seen from two sides — one keeps
 the web UI honest about phone geometry, the other is the frame that UI is shown
-in on a phone — and because the alternative was seven hand-maintained copies of
+in on a phone — and because the alternative was eight hand-maintained copies of
 one Activity, already drifting.
 
 **Neither half can disturb the other's consumers.** `files: ["dist"]` in
@@ -167,7 +167,7 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 ## Android: the WebView app shell
 
 `android/` is a Gradle build publishing one library, `org.xinutec:shell` — the
-Activity the fleet's seven WebView wrappers are. An app declares its URL and its
+Activity the fleet's eight WebView wrappers are. An app declares its URL and its
 opt-ins; the shell owns system-bar insets (including the IME), bars painted with
 the page's own colour, restore-on-reopen filtered so a spent login callback can't
 strand the app, and back through SPA history on the modern dispatcher.
@@ -203,5 +203,5 @@ their config from it, so a change here lands everywhere at once — run their
 
 `scripts/verify.sh` covers both halves and is what the pre-commit hook runs: the
 npm build and specs, then the shell's unit tests and an `assembleDebug` of life
-against it. Seven apps ride on the Android half, so a red run there is a real
+against it. Eight apps ride on the Android half, so a red run there is a real
 regression in every one of them.

@@ -1,9 +1,14 @@
 # org.xinutec:shell — the fleet's Android WebView shell
 
-Seven apps (coach, fleetwatch, health, home, life, messages, thoth) are the same
-thing: an Angular SPA shown full-screen in a `WebView`, no address bar, no tabs, a
-home-screen icon. Each used to keep its own copy of that Activity. This is the
-copy they share.
+Eight apps (coach, fleetwatch, health, home, life, messages, thoth, and recall's
+web viewer) are the same thing: an Angular SPA shown full-screen in a `WebView` —
+no address bar, no tabs, a home-screen icon. Each used to keep its own copy of that
+Activity. This is the copy they share.
+
+Note the eighth. recall is a capture app, so it reads as out of scope — but it has
+two modules, and `web/` is exactly this wrapper. It had drifted to insetting for
+`systemBars()` alone, so the keyboard drew over the page: the precise bug the other
+seven had already fixed, sitting in the repo nobody thought to look in.
 
 ## Consuming it
 
@@ -21,7 +26,9 @@ In `app/build.gradle.kts`:
 
 ```kotlin
 // Fail in a sentence rather than a stacktrace when the shell isn't beside us.
-require(file("../../ui-harness/android").isDirectory) {
+// Resolved against rootDir (android/) so it is the same path settings.gradle.kts
+// includes; a bare file() here would resolve against app/ and never match.
+require(rootDir.resolve("../../ui-harness/android").isDirectory) {
     "ui-harness must be checked out beside this repo (~/Code/ui-harness)"
 }
 
@@ -49,6 +56,18 @@ class MainActivity : WebShellActivity() {
     override val shell = ShellConfig(url = "https://home.xinutec.org/")
 }
 ```
+
+**An app is confined to its own host by default.** A chromeless view has no
+address bar, so a foreign page opening in place still looks like the app;
+anything not in `allowedHosts` is handed to the real browser instead. Two
+consequences worth knowing before you copy a config:
+
+- **An app behind a login must list its identity provider**, or the login hop is
+  ejected to the browser and the app can never sign in — a failure that surfaces
+  months later, when the session finally expires, not on the day you change it.
+  The fleet's is `dash.xinutec.org`.
+- `allowedHosts = emptySet()` declines confinement entirely. That is a visible
+  choice, not the default.
 
 Everything else is an override rather than a flag, because a flag can only express
 what was anticipated:
@@ -89,4 +108,4 @@ nix develop .#android --command ./android/gradlew -p android :main:test
 
 Building any consuming app builds this too, through the composite. `scripts/verify.sh`
 runs the library's own unit tests and then builds life against it, so a breaking
-change lands in this repo rather than in seven apps at once.
+change lands in this repo rather than in eight apps at once.
