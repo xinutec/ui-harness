@@ -131,6 +131,40 @@ class ConfinementTest {
     }
 
     @Test
+    fun `an entry written as a URL is refused on the way up`() {
+        // It would compare against a navigation's authority, which never carries a
+        // scheme, so it would match nothing in silence — and on an app behind a login
+        // that is the identity provider quietly confined out, surfacing months later
+        // when the session expires.
+        val thrown =
+            try {
+                ShellConfig(
+                    url = "https://health.xinutec.org/",
+                    allowedHosts = setOf("health.xinutec.org", "https://dash.xinutec.org"),
+                )
+                null
+            } catch (e: IllegalArgumentException) {
+                e
+            }
+        assertTrue("a scheme-bearing entry must be refused", thrown != null)
+        assertTrue(thrown!!.message!!.contains("https://dash.xinutec.org"))
+        // A trailing slash is the same mistake in a smaller spelling.
+        assertThrowsIae { ShellConfig(url = "https://x.test/", allowedHosts = setOf("x.test/")) }
+        assertThrowsIae { ShellConfig(url = "https://x.test/", allowedHosts = setOf("")) }
+    }
+
+    private fun assertThrowsIae(body: () -> Unit) {
+        val threw =
+            try {
+                body()
+                false
+            } catch (_: IllegalArgumentException) {
+                true
+            }
+        assertTrue("expected IllegalArgumentException", threw)
+    }
+
+    @Test
     fun `an empty set is a deliberate refusal to confine`() {
         assertTrue(inApp("https://home.xinutec.org/", emptySet(), "https", "anywhere.test"))
     }

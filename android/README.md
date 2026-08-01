@@ -57,12 +57,15 @@ class MainActivity : WebShellActivity() {
 }
 ```
 
-**An app is confined to its own authority by default** — scheme, host *and* port,
-the same thing `Restore` means by "the app". A chromeless view has no address bar,
-so a foreign page opening in place still looks like the app; anything not in
-`allowedHosts` is handed to the real browser instead. Sub-frames are never ejected:
-a frame is part of the page, not a navigation away from it. Three consequences
-worth knowing before you copy a config:
+**An app is confined to its own authority by default** — scheme, host *and* port.
+`Restore` calls the same two functions to decide what may be remembered, so
+"the app" is one definition rather than two that agree until they don't.
+
+A chromeless view has no address bar, so a foreign page opening in place still
+looks like the app; anything not in `allowedHosts` is handed to the real browser
+instead. Sub-frames are never ejected: a frame is part of the page, not a
+navigation away from it. Three consequences worth knowing before you copy a
+config:
 
 - **An app behind a login must list its identity provider**, or the login hop is
   ejected to the browser and the app can never sign in — a failure that surfaces

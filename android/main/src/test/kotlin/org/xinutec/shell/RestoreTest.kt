@@ -62,6 +62,35 @@ class RestoreTest {
     }
 
     @Test
+    fun `it agrees with confinement about a redundant default port`() {
+        // The spelling the two predicates used to disagree on: confinement normalises
+        // :443 away and opens the page in place, so refusing to remember it would make
+        // the page reachable but not rememberable. They share the implementation now.
+        assertTrue(restorable("https://fleetwatch.xinutec.org:443/problems"))
+        assertTrue(Restore.isRestorable("https://fleetwatch.xinutec.org:443/", base + "problems"))
+        // A port that is NOT the default is still a different app.
+        assertFalse(restorable("https://fleetwatch.xinutec.org:8443/problems"))
+    }
+
+    @Test
+    fun `a different scheme is a different app`() {
+        assertFalse(restorable("http://fleetwatch.xinutec.org/problems"))
+    }
+
+    @Test
+    fun `a base carrying a path confines to that subtree`() {
+        val sub = "https://example.test/app/"
+        assertTrue(Restore.isRestorable(sub, "https://example.test/app/page"))
+        assertTrue(Restore.isRestorable(sub, "https://example.test/app"))
+        assertFalse(Restore.isRestorable(sub, "https://example.test/other"))
+        // The transient check applies to the first segment BELOW the base, not the URL.
+        assertFalse(Restore.isRestorable(sub, "https://example.test/app/login"))
+        assertTrue(
+            Restore.isRestorable("https://example.test/login/", "https://example.test/login/x"),
+        )
+    }
+
+    @Test
     fun `a cleartext LAN base restores like any other`() {
         // thoth serves plain HTTP on the LAN, with a port in the authority.
         val lan = "http://192.168.1.81:8089/"

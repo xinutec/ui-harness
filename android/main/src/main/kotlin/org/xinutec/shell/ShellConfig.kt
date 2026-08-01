@@ -43,7 +43,23 @@ data class ShellConfig(
     val webDebugging: WebDebugging = WebDebugging.NEVER,
     /** SharedPreferences file holding the restore point. */
     val prefsName: String = "viewer",
-)
+) {
+    init {
+        for (entry in allowedHosts) {
+            // An entry written as a URL is compared against a navigation's authority,
+            // which never contains a scheme or a slash — so it would match nothing, in
+            // silence. On an app behind a login that means the identity provider is
+            // confined out, and nothing goes wrong until the session expires months
+            // later and the sign-in is ejected to the browser. Crash on the way up
+            // instead, where the mistake and the message are in the same place.
+            require(entry.isNotEmpty() && "/" !in entry) {
+                "allowedHosts takes an authority — \"host\" or \"host:port\" — not a URL: " +
+                    "got \"$entry\". Write \"dash.xinutec.org\", not " +
+                    "\"https://dash.xinutec.org\"."
+            }
+        }
+    }
+}
 
 /**
  * Whether the live page can be inspected over adb (`chrome://inspect`, or CDP

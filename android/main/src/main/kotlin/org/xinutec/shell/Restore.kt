@@ -12,6 +12,14 @@ package org.xinutec.shell
  *
  * Applied to every wrapper, including the two with no login at all: a rule that only
  * holds where someone remembered to copy it is the rule that stranded fleetwatch.
+ *
+ * "The app itself" is [schemeOf] + [authorityOf] — the same call, not merely the same
+ * intention, as the one confinement makes in `Confinement.kt`. It used to be a string
+ * prefix here, which agreed with confinement almost everywhere and disagreed exactly
+ * where the port normalisation applies: `https://app/` against `https://app:443/page`
+ * would open in place and then be refused as a restore point. A page reachable but not
+ * rememberable is the failure this whole predicate exists to prevent, so the two share
+ * an implementation rather than a resemblance.
  */
 object Restore {
     /** First path segments that belong to the login round-trip, not to the app. */
@@ -19,14 +27,21 @@ object Restore {
 
     /** True if [url] is a page of the app worth reopening on. */
     fun isRestorable(base: String, url: String): Boolean {
-        // Compare on a path boundary, so a look-alike host (…xinutec.org.evil.test)
-        // can't pass as the app just by sharing a prefix. Tolerates a [base] written
-        // with or without its trailing slash.
-        val root = base.removeSuffix("/")
-        if (url != root && !url.startsWith("$root/")) return false
-        val path = url.removePrefix(root).removePrefix("/")
+        val scheme = schemeOf(base) ?: return false
+        if (schemeOf(url) != scheme) return false
+        // Same origin, port and all — so a look-alike host (…xinutec.org.evil.test)
+        // can't pass as the app by sharing a prefix, and a neighbouring service on the
+        // same box is not the app either.
+        val authority = authorityOf(base) ?: return false
+        if (authorityOf(url) != authority) return false
+        // A [base] carrying a path confines to that subtree; an origin-only base (every
+        // app today) confines to all of it. Tolerates a base written with or without
+        // its trailing slash.
+        val root = pathOf(base).removeSuffix("/")
+        val path = pathOf(url)
+        if (path != root && !path.startsWith("$root/")) return false
         // Match on the whole first segment, so a page called "logins" still restores.
-        val head = path.substringBefore('?').substringBefore('#').substringBefore('/')
+        val head = path.removePrefix(root).removePrefix("/").substringBefore('/')
         return head !in TRANSIENT
     }
 }

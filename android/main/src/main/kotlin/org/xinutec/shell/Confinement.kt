@@ -40,6 +40,18 @@ internal fun schemeOf(url: String): String? =
     url.substringBefore("://", missingDelimiterValue = "").lowercase().ifEmpty { null }
 
 /**
+ * The path in [url], from its leading `/`, without query or fragment. Empty when the
+ * URL is bare authority (`https://example.test`).
+ */
+internal fun pathOf(url: String): String {
+    val afterScheme = url.substringAfter("://", missingDelimiterValue = "")
+    if (afterScheme.isEmpty()) return ""
+    val slash = afterScheme.indexOf('/')
+    if (slash < 0) return ""
+    return afterScheme.substring(slash).substringBefore('?').substringBefore('#')
+}
+
+/**
  * `host[:port]` with a redundant port removed, so `example.test:443` under https
  * and `example.test` are one authority rather than two that never match.
  */
