@@ -5,12 +5,14 @@
 # Run it the same way everywhere so local-green and CI-green can't diverge:
 #   - by hand:   nix develop -c scripts/verify.sh
 #   - pre-commit:  scripts/githooks/pre-commit calls it (see scripts/setup-hooks.sh)
-#   - CI:        .github/workflows/ci.yml runs the same steps
+#   - CI:        .github/workflows/ci.yml runs the node steps only — no Android SDK
+#                on the runner, and nothing in the fleet builds Android in CI
 #
 # Twelve Angular frontends ride on this package — on its measurement functions
 # and, since the config was modelled here, on their Playwright config and static
-# server too. A red run here is a real regression in every one of them. Steps
-# run cheapest-first.
+# server too — and seven Android wrappers ride on android/. A red run here is a
+# real regression in every one of them. Steps run cheapest-first, so the Android
+# half (a JVM, an SDK and a full APK) comes last.
 set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,5 +49,36 @@ step "playwright fixture specs (measurement fns @ phone geometry)"
 # comes from playwright's own cache; install is idempotent (fast when present).
 npx playwright install chromium
 npm test
+
+# ---- the Android half ----
+#
+# Its toolchain (JDK, SDK, ktlint) is a different dev shell, so each step enters
+# it. Nested `nix develop` is fine; the outer one only carries node.
+android() { nix develop .#android --command "$@"; }
+
+step "ktlint (android/)"
+# dev-lint's DL-KTLINT discovers apps by <module>/app/src/main/AndroidManifest.xml,
+# which a library module has none of — so the shell would otherwise be the one
+# Kotlin in the fleet with no formatting gate. Same .editorconfig as every app.
+android ktlint "android/main/src/**/*.kt" "android/*.kts"
+
+step "shell unit tests (org.xinutec:shell)"
+# Restore's predicate and the CSS-colour parse — the two pieces of the shell that
+# can be wrong without anything crashing.
+android ./android/gradlew -p android --console=plain :main:test
+
+step "life built against the shell (the demanding consumer)"
+# The API was designed against life, so life is what proves it still fits. Building
+# it exercises the composite substitution end to end, and puts a breaking change in
+# the repo that caused it rather than in seven apps at once.
+life_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/life"
+[ -d "$life_dir" ] || life_dir="$HOME/Code/life"
+if [ -d "$life_dir/android" ]; then
+  android "$life_dir/android/gradlew" -p "$life_dir/android" --console=plain :app:assembleDebug
+else
+  # Loud, not silent: a green run that skipped the consumer check is not the same
+  # green as one that did it.
+  printf '\033[1;33mSKIPPED\033[0m — life is not checked out beside this repo; the consumer build did not run\n'
+fi
 
 printf '\n\033[1;32mALL GREEN\033[0m — verified\n'

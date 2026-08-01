@@ -1,0 +1,19 @@
+# Version catalog for the shared WebView shell library.
+#
+# AGP and Kotlin must match every consuming app's catalog: the apps include this
+# build, and one Gradle invocation cannot load two versions of the Android plugin.
+[versions]
+agp = "8.13.0"
+kotlin = "2.4.0"
+coreKtx = "1.16.0"
+activity = "1.13.0"
+junit = "4.13.2"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

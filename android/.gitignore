@@ -1,0 +1,8 @@
+# Android / Gradle build artifacts
+.gradle/
+build/
+main/build/
+local.properties
+*.aar
+captures/
+.cxx/

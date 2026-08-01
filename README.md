@@ -164,9 +164,31 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 - `expectReachableByScroll(page, locator, scrollerSel)` — swipe until the target
   is on-screen; fails if a nested-scroller fight keeps it unreachable.
 
+## Android: the WebView app shell
+
+`android/` is a Gradle build publishing one library, `org.xinutec:shell` — the
+Activity the fleet's seven WebView wrappers are. An app declares its URL and its
+opt-ins; the shell owns system-bar insets (including the IME), bars painted with
+the page's own colour, restore-on-reopen filtered so a spent login callback can't
+strand the app, and back through SPA history on the modern dispatcher.
+
+Consumed as a **composite build**, resolved by path, with no version anywhere:
+
+```kotlin
+// the app's android/settings.gradle.kts
+includeBuild("../../ui-harness/android") {
+    dependencySubstitution {
+        substitute(module("org.xinutec:shell")).using(project(":main"))
+    }
+}
+```
+
+Full API, the manifest attributes an app still owns, and how to build it:
+[android/README.md](android/README.md).
+
 ## Developing the harness
 
-`npm ci && npm test` runs the package's own specs. Three kinds:
+`npm ci && npm test` runs the web half's own specs. Three kinds:
 `tests/measurement.spec.ts` — `page.setContent` DOM fixtures for the layout
 checks (ellipsis-phantom, clip-model and icon-glyph-vs-badge false positives,
 real overlap/overflow detection, the allow-list); `tests/config.spec.ts` — the
@@ -178,3 +200,8 @@ Twelve frontends consume this (coach, fleetwatch, gamepads, health, home, life,
 memview, messages, observe, recall, thoth, utterance) and all of them now take
 their config from it, so a change here lands everywhere at once — run their
 `ui-check` after anything that touches `config.ts` or `serve.ts`.
+
+`scripts/verify.sh` covers both halves and is what the pre-commit hook runs: the
+npm build and specs, then the shell's unit tests and an `assembleDebug` of life
+against it. Seven apps ride on the Android half, so a red run there is a real
+regression in every one of them.
