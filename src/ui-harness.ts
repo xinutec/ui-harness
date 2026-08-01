@@ -269,6 +269,107 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 	return out;
 }
 
+/** An icon whose own box is painted too small to show its glyph. */
+export interface ClippedIcon {
+	/** The ligature name — `hourglass_top` — which is also the element's text. */
+	icon: string;
+	/** Painted content box, px. */
+	painted: number;
+	/** The glyph's design size (font-size), px. */
+	glyph: number;
+	axis: "width" | "height";
+	/** The icon's parent (tag + leading classes) — the flex row that squeezed it. */
+	inside: string;
+}
+
+/**
+ * Runs in the browser. The failure class the text checks deliberately skip:
+ * an icon squeezed BELOW its glyph and clipped by its own box.
+ *
+ * `mat-icon` ships with `overflow: hidden`, and a flex item whose overflow is not
+ * `visible` loses the `min-width: auto` floor that stops it collapsing below its
+ * content. Put one beside a text sibling — whose `flex-basis: auto` resolves to
+ * the whole unwrapped sentence — and the icon absorbs nearly all of the row's
+ * shrink. It is then clipped rather than scaled, so it paints as a fragment of a
+ * glyph (recall's "Still being finalized" banner: 9.6px of a 24px hourglass,
+ * while the shorter sentence beside it lost 0.7px and looked fine).
+ *
+ * Nothing else here can see it. There is no horizontal overflow — shrinking is
+ * precisely what avoids overflow — no text overlap, and no occlusion.
+ * findClippedText skips icon ligatures on purpose (an icon straddling a clip edge
+ * is not a sheared word) and only looks at vertical shear.
+ *
+ * The discriminator is the painted box against the FONT-SIZE, not scrollWidth: if
+ * the icon font has not loaded, the element's content is the literal ligature word
+ * and scrollWidth is huge, which would flag every icon in the app. Font-size is
+ * stable either way — pair this with expectIconFontLoaded, which is the check that
+ * owns that failure.
+ *
+ * `args` is [rootSel, minPx]: scope to a container, and ignore squeezes under
+ * `minPx` (sub-pixel rounding; a 0.7px loss is invisible and not worth a failure).
+ */
+export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
+	const [rootSel, minPx] = args;
+	const root = rootSel ? document.querySelector(rootSel) : document.body;
+	if (!root) return [];
+	const describe = (el: Element | null): string => {
+		if (!el) return "(detached)";
+		const cls =
+			typeof el.className === "string" && el.className.trim()
+				? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+				: "";
+		return el.tagName.toLowerCase() + cls;
+	};
+	const out: ClippedIcon[] = [];
+	const sel = "mat-icon, .material-icons, .material-symbols-outlined, .material-symbols-rounded";
+	for (const el of Array.from(root.querySelectorAll(sel))) {
+		const st = getComputedStyle(el);
+		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		// Only a box that CLIPS can hide part of its glyph; `overflow: visible` spills
+		// the icon outside its box, which is ugly but not this defect.
+		if (st.overflowX === "visible" && st.overflowY === "visible") continue;
+		const box = el.getBoundingClientRect();
+		if (box.width === 0 || box.height === 0) continue; // laid out but not painted
+		const glyph = Number.parseFloat(st.fontSize);
+		if (!Number.isFinite(glyph) || glyph <= 0) continue;
+		const icon = (el.textContent ?? "").trim();
+		const flag = (axis: "width" | "height", painted: number): void => {
+			if (painted + minPx >= glyph) return;
+			out.push({
+				icon,
+				painted: Math.round(painted * 10) / 10,
+				glyph: Math.round(glyph * 10) / 10,
+				axis,
+				inside: describe(el.parentElement),
+			});
+		};
+		if (st.overflowX !== "visible") flag("width", box.width);
+		if (st.overflowY !== "visible") flag("height", box.height);
+	}
+	return out;
+}
+
+/**
+ * Assert every icon has room for its glyph. `rootSel` scopes to a container;
+ * `minPx` is the squeeze ignored as sub-pixel noise. Call `expectIconFontLoaded`
+ * alongside it — this one measures boxes, that one proves the glyphs exist.
+ */
+export async function expectNoClippedIcons(
+	page: Page,
+	testInfo: TestInfo,
+	rootSel: string | null = null,
+	minPx = 1,
+): Promise<void> {
+	await leaveSnapshot(page, testInfo);
+
+	const clips = await page.evaluate(findClippedIcons, [rootSel, minPx] as [string | null, number]);
+	if (clips.length === 0) return;
+	const detail = clips
+		.map((c) => `  ${c.icon || "(icon)"}: ${c.painted}px of a ${c.glyph}px glyph (${c.axis}), inside ${c.inside}`)
+		.join("\n");
+	throw new LayoutError(`Icons squeezed below their glyph and clipped (${clips.length}):\n${detail}`);
+}
+
 /**
  * Assert no visible text is permanently sheared by a clipping ancestor. `rootSel`
  * scopes to a container (an open dialog); `minPx` is the shear ignored as

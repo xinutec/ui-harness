@@ -143,8 +143,23 @@ test('the suite really runs at phone geometry', async ({ page }) => {
   hidden behind other paint (a FAB sunk under the bottom nav).
 - `expectViewportIsPhone(page, width?)` — the checker-checker: fails loudly if
   device emulation ever silently drops.
+- `expectNoClippedText(page, testInfo, rootSel?, minPx?)` — no visible text is
+  permanently sheared by an overflow-clipping ancestor. The scroll test keeps it
+  honest: text scrolled out of a scroller comes back, so only a clip the container
+  *cannot* scroll away counts.
 - `expectIconFontLoaded(page, family?)` — the icon font actually loaded (no
   tofu boxes for Material Icons).
+- `expectNoClippedIcons(page, testInfo, rootSel?, minPx?)` — every icon has room
+  for its glyph. `mat-icon` carries `overflow: hidden`, which voids the
+  `min-width: auto` floor that stops a flex item collapsing below its content, so
+  an icon beside a long text sibling absorbs the row's shrink and is clipped
+  rather than scaled — recall's status banner painted 9.6px of a 24px hourglass
+  while the shorter sentence beside it lost 0.7px and looked fine. No other check
+  sees it: shrinking is what *avoids* overflow, nothing overlaps, nothing is
+  occluded, and `expectNoClippedText` skips icon ligatures by design. Measures the
+  painted box against **font-size**, not `scrollWidth`, so an unloaded icon font
+  (whose content is the literal ligature word) cannot flag every icon in the app —
+  that failure belongs to `expectIconFontLoaded`, which is worth calling beside it.
 - `expectCanvasLegible(page, testInfo, sel?, minRatio?, minPainted?)` — a
   canvas's marks are actually visible against the page behind them. Canvas is
   the one place the stylesheet does not reach: an unparseable colour assigned to

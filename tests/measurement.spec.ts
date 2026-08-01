@@ -4,6 +4,7 @@ import {
   findHorizontalOverflow,
   findOccludedControls,
   findClippedText,
+  findClippedIcons,
   findCanvasContrast,
   expectViewportIsPhone,
   swipeUp,
@@ -360,4 +361,73 @@ test('reports an unpainted canvas rather than scoring it', async ({ page }) => {
   await page.setContent(canvasPage(''));
   const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
   expect(measured[0].painted).toBe(0);
+});
+
+/** A `mat-icon` as Angular Material ships it: fixed 24px box, clipping overflow,
+ *  ligature text inside. The `overflow: hidden` is the load-bearing part — it is
+ *  what voids the flex `min-width: auto` floor. */
+const matIcon = (name: string): string =>
+  `<mat-icon style="display:inline-block;width:24px;height:24px;overflow:hidden;font-size:24px;line-height:1">${name}</mat-icon>`;
+
+test('detects an icon squeezed below its glyph by a long flex sibling', async ({ page }) => {
+  // recall's "Still being finalized" banner, reduced: the span's flex-basis is the
+  // whole unwrapped sentence, so the icon absorbs the row's shrink and is clipped.
+  await page.setContent(
+    phonePage(`
+    <div style="display:flex;align-items:center;gap:0.6rem;width:300px;font:14px sans-serif">
+      ${matIcon('hourglass_top')}
+      <span>Still being finalized — diarizing into speaker-separated turns. Annotation opens
+      once it is settled, so your edits land on the final version.</span>
+    </div>`),
+  );
+  const clips = await page.evaluate(findClippedIcons, [null, 1] as [string | null, number]);
+  expect(clips.map((c) => c.icon)).toEqual(['hourglass_top']);
+  expect(clips[0].painted).toBeLessThan(20);
+  expect(clips[0].glyph).toBe(24);
+});
+
+test('does NOT flag the same row once the icon is told not to shrink', async ({ page }) => {
+  await page.setContent(
+    phonePage(`
+    <div style="display:flex;align-items:center;gap:0.6rem;width:300px;font:14px sans-serif">
+      <mat-icon style="display:inline-block;width:24px;height:24px;overflow:hidden;font-size:24px;line-height:1;flex-shrink:0">hourglass_top</mat-icon>
+      <span>Still being finalized — diarizing into speaker-separated turns. Annotation opens
+      once it is settled, so your edits land on the final version.</span>
+    </div>`),
+  );
+  expect(await page.evaluate(findClippedIcons, [null, 1] as [string | null, number])).toEqual([]);
+});
+
+test('does NOT flag a sub-pixel squeeze', async ({ page }) => {
+  // The sibling banner in the same app lost 0.7px and looked perfect. A check that
+  // fails on that is a check nobody keeps.
+  await page.setContent(
+    phonePage(`
+    <div style="display:flex;align-items:center;width:300px;font:14px sans-serif">
+      ${matIcon('check_circle')}
+      <span>Finalized — name the voices.</span>
+    </div>`),
+  );
+  expect(await page.evaluate(findClippedIcons, [null, 1] as [string | null, number])).toEqual([]);
+});
+
+test('does NOT flag every icon when the icon font has not loaded', async ({ page }) => {
+  // Without the font, the element's content is the literal word `hourglass_top` and
+  // scrollWidth is enormous — which is why this measures the painted box against
+  // font-size instead. Flagging here would misreport across all five apps.
+  await page.setContent(phonePage(`<div style="font:14px sans-serif">${matIcon('hourglass_top')}</div>`));
+  expect(await page.evaluate(findClippedIcons, [null, 1] as [string | null, number])).toEqual([]);
+});
+
+test('does NOT flag an icon that spills instead of clipping', async ({ page }) => {
+  // overflow:visible means the glyph is drawn in full, outside its box. Ugly, maybe,
+  // but nothing is hidden — a different defect, and not this one.
+  await page.setContent(
+    phonePage(`
+    <div style="display:flex;width:120px;font:14px sans-serif">
+      <mat-icon style="display:inline-block;width:24px;height:24px;overflow:visible;font-size:24px;line-height:1">hourglass_top</mat-icon>
+      <span>a sentence long enough to squeeze its neighbour severely indeed</span>
+    </div>`),
+  );
+  expect(await page.evaluate(findClippedIcons, [null, 1] as [string | null, number])).toEqual([]);
 });
