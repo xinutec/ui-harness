@@ -23,7 +23,9 @@
   },
   "types": "./dist/ui-harness.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "tsconfig.build.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

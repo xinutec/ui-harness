@@ -41,6 +41,15 @@ install produces a ready-to-load package. (This replaces the old in-monorepo
 mechanism of importing `src/ui-harness.ts` by relative path — that only worked
 because both lived in the same tree.)
 
+`files` therefore ships `src/` and `tsconfig.build.json` **as well as** `dist/`,
+so the package can be rebuilt from what it publishes. That matters for consumers
+that install with `--ignore-scripts`, which is every pure Nix build: `prepare`
+never runs there, so `dist/` is absent, and with `files: ["dist"]` alone the
+installed package was just a `package.json` — nothing to import and nothing to
+compile, which is how thoth's packaged build failed (2026-08-01). Shipping the
+sources costs a few kB and makes "install without running my code, then build it
+yourself" a supported path rather than a dead end.
+
 ## Consuming (per app)
 
 Installed as a **public git dependency** — anonymous `https` clone, no registry,
