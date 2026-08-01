@@ -249,7 +249,16 @@ abstract class WebShellActivity : ComponentActivity() {
             request: WebResourceRequest,
         ): Boolean {
             val url = request.url
-            if (staysInApp(shell.url, shell.allowedHosts, url.scheme, url.host)) return false
+            val inApp =
+                staysInApp(
+                    appUrl = shell.url,
+                    allowed = shell.allowedHosts,
+                    isMainFrame = request.isForMainFrame,
+                    scheme = url.scheme,
+                    host = url.host,
+                    port = url.port,
+                )
+            if (inApp) return false
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, url))
             } catch (_: ActivityNotFoundException) {

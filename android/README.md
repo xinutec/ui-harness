@@ -57,15 +57,20 @@ class MainActivity : WebShellActivity() {
 }
 ```
 
-**An app is confined to its own host by default.** A chromeless view has no
-address bar, so a foreign page opening in place still looks like the app;
-anything not in `allowedHosts` is handed to the real browser instead. Two
-consequences worth knowing before you copy a config:
+**An app is confined to its own authority by default** — scheme, host *and* port,
+the same thing `Restore` means by "the app". A chromeless view has no address bar,
+so a foreign page opening in place still looks like the app; anything not in
+`allowedHosts` is handed to the real browser instead. Sub-frames are never ejected:
+a frame is part of the page, not a navigation away from it. Three consequences
+worth knowing before you copy a config:
 
 - **An app behind a login must list its identity provider**, or the login hop is
   ejected to the browser and the app can never sign in — a failure that surfaces
   months later, when the session finally expires, not on the day you change it.
   The fleet's is `dash.xinutec.org`.
+- **The port counts.** On a box running several of the fleet's services — the Mac
+  (thoth on :8089), isis (recall's viewer on :8000) — a host-only entry would let
+  every neighbour open in place. A bare host means the scheme's default port.
 - `allowedHosts = emptySet()` declines confinement entirely. That is a visible
   choice, not the default.
 

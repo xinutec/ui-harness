@@ -17,19 +17,39 @@ import org.junit.Test
  */
 class ConfinementTest {
     @Test
-    fun `the host comes out without scheme, port or userinfo`() {
-        assertEquals("life.xinutec.org", hostOf("https://life.xinutec.org/"))
-        assertEquals("life.xinutec.org", hostOf("https://life.xinutec.org/planner?x=1#y"))
-        assertEquals("192.168.1.81", hostOf("http://192.168.1.81:8089/"))
-        assertEquals("10.100.0.2", hostOf("http://10.100.0.2:8000/"))
-        assertEquals("dash.xinutec.org", hostOf("https://user@dash.xinutec.org/login"))
-        assertNull(hostOf("not-a-url"))
+    fun `the authority comes out without scheme or userinfo, and keeps the port`() {
+        assertEquals("life.xinutec.org", authorityOf("https://life.xinutec.org/"))
+        assertEquals("life.xinutec.org", authorityOf("https://life.xinutec.org/planner?x=1#y"))
+        assertEquals("192.168.1.81:8089", authorityOf("http://192.168.1.81:8089/"))
+        assertEquals("10.100.0.2:8000", authorityOf("http://10.100.0.2:8000/"))
+        assertEquals("dash.xinutec.org", authorityOf("https://user@dash.xinutec.org/login"))
+        assertNull(authorityOf("not-a-url"))
     }
 
     @Test
-    fun `an app is confined to its own host by default`() {
-        val cfg = ShellConfig(url = "https://health.xinutec.org/")
-        assertEquals(setOf("health.xinutec.org"), cfg.allowedHosts)
+    fun `a port that is the scheme's default is not a second authority`() {
+        assertEquals("health.xinutec.org", authorityOf("https://health.xinutec.org:443/"))
+        assertEquals("thoth.test", authorityOf("http://thoth.test:80/"))
+        assertEquals("thoth.test:8089", authorityOf("https://thoth.test:8089/"))
+    }
+
+    @Test
+    fun `an IPv6 literal keeps its brackets and its port`() {
+        assertEquals("[fd00::1]", authorityOf("http://[fd00::1]/"))
+        assertEquals("[fd00::1]:8000", authorityOf("http://[fd00::1]:8000/"))
+    }
+
+    @Test
+    fun `an app is confined to its own authority by default`() {
+        assertEquals(
+            setOf("health.xinutec.org"),
+            ShellConfig(url = "https://health.xinutec.org/").allowedHosts,
+        )
+        // The port travels with it: thoth is one of several services on the Mac.
+        assertEquals(
+            setOf("192.168.1.81:8089"),
+            ShellConfig(url = "http://192.168.1.81:8089/").allowedHosts,
+        )
     }
 
     @Test
@@ -45,6 +65,36 @@ class ConfinementTest {
         // The near-miss that a prefix check would have let through.
         assertFalse(
             inApp("https://health.xinutec.org/", allowed, "https", "health.xinutec.org.evil.test"),
+        )
+    }
+
+    @Test
+    fun `a neighbouring service on the same box is not the app`() {
+        // The disagreement this resolves: Restore has always compared the port, so a
+        // host-only confinement let :8090 open in place and then refused to remember
+        // it. Both now mean the same thing by "the app".
+        val thoth = "http://192.168.1.81:8089/"
+        val allowed = ShellConfig(url = thoth).allowedHosts
+        assertTrue(inApp(thoth, allowed, "http", "192.168.1.81", port = 8089))
+        assertFalse(inApp(thoth, allowed, "http", "192.168.1.81", port = 8090))
+        assertFalse(Restore.isRestorable(thoth, "http://192.168.1.81:8090/speakers"))
+    }
+
+    @Test
+    fun `a sub-frame is never ejected to the browser`() {
+        // Ejecting one would cancel the frame's load and throw the phone's browser
+        // over the app — stranger than whatever the frame meant to render.
+        val allowed = setOf("life.xinutec.org")
+        assertFalse(inApp("https://life.xinutec.org/", allowed, "https", "embed.example.test"))
+        assertTrue(
+            staysInApp(
+                appUrl = "https://life.xinutec.org/",
+                allowed = allowed,
+                isMainFrame = false,
+                scheme = "https",
+                host = "embed.example.test",
+                port = -1,
+            ),
         )
     }
 
@@ -67,10 +117,10 @@ class ConfinementTest {
     fun `a cleartext LAN app keeps its own scheme`() {
         // thoth and recall's viewer are http on private addresses; confining them
         // must not eject every page they serve.
-        val thoth = ShellConfig(url = "http://192.168.1.81:8089/").allowedHosts
-        assertEquals(setOf("192.168.1.81"), thoth)
-        assertTrue(inApp("http://192.168.1.81:8089/", thoth, "http", "192.168.1.81"))
-        assertTrue(inApp("http://192.168.1.81:8089/", thoth, "https", "192.168.1.81"))
+        val thoth = "http://192.168.1.81:8089/"
+        val allowed = ShellConfig(url = thoth).allowedHosts
+        assertTrue(inApp(thoth, allowed, "http", "192.168.1.81", port = 8089))
+        assertTrue(inApp(thoth, allowed, "https", "192.168.1.81", port = 8089))
     }
 
     @Test
@@ -85,6 +135,11 @@ class ConfinementTest {
         assertTrue(inApp("https://home.xinutec.org/", emptySet(), "https", "anywhere.test"))
     }
 
-    private fun inApp(app: String, allowed: Set<String>, scheme: String?, host: String?) =
-        staysInApp(app, allowed, scheme, host)
+    private fun inApp(
+        app: String,
+        allowed: Set<String>,
+        scheme: String?,
+        host: String?,
+        port: Int = -1,
+    ) = staysInApp(app, allowed, isMainFrame = true, scheme = scheme, host = host, port = port)
 }

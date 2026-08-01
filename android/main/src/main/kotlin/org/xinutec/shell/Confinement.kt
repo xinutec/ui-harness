@@ -4,20 +4,35 @@ package org.xinutec.shell
 //
 // A chromeless view has no URL bar, so a page that opens in place *is* the app as
 // far as anyone looking at it can tell. Confinement is therefore the default: an
-// app is allowed its own host, and anything else is handed to the real browser,
-// where it arrives with an address bar and its own identity.
+// app is allowed its own authority, and anything else is handed to the real
+// browser, where it arrives with an address bar and its own identity.
+//
+// **"The app" means scheme + host + port**, and it means that here and in
+// [Restore] alike. The port is not incidental: thoth is one of many services on
+// the Mac (:8089) and recall's viewer one of many on isis (:8000), so a
+// host-only rule would let every neighbouring service open in place wearing the
+// app's face. Restore has always compared the port — this file used to compare
+// only the host, and two definitions of "the app" in one library is how a URL
+// comes to be reachable but not rememberable.
 //
 // These are string predicates rather than `Uri` work so they can be unit-tested;
 // the framework's parser is only used for the request that comes off the wire.
 
-/** The host in [url], without userinfo or port. Null if it has no authority. */
-internal fun hostOf(url: String): String? {
+/**
+ * The authority in [url] — host, plus `:port` when it is not the scheme's default.
+ * Userinfo is dropped. Null if [url] has no authority at all.
+ */
+internal fun authorityOf(url: String): String? {
     val afterScheme = url.substringAfter("://", missingDelimiterValue = "")
     if (afterScheme.isEmpty()) return null
-    val authority =
-        afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
-    val host = authority.substringAfterLast('@').substringBefore(':')
-    return host.ifEmpty { null }
+    val raw =
+        afterScheme
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+            .substringAfterLast('@')
+    if (raw.isEmpty()) return null
+    return normaliseAuthority(schemeOf(url), raw)
 }
 
 /** The scheme in [url] (`https`, `http`, …), lowercased. Null if it has none. */
@@ -25,22 +40,52 @@ internal fun schemeOf(url: String): String? =
     url.substringBefore("://", missingDelimiterValue = "").lowercase().ifEmpty { null }
 
 /**
- * Whether a navigation to [scheme]://[host] stays in the app.
+ * `host[:port]` with a redundant port removed, so `example.test:443` under https
+ * and `example.test` are one authority rather than two that never match.
+ */
+internal fun normaliseAuthority(scheme: String?, hostAndPort: String): String {
+    // An IPv6 literal is bracketed and full of colons; its port, if any, follows
+    // the closing bracket.
+    val hostEnd = if (hostAndPort.startsWith("[")) hostAndPort.indexOf(']') + 1 else 0
+    val sep = hostAndPort.indexOf(':', startIndex = hostEnd)
+    if (sep < 0) return hostAndPort
+    val host = hostAndPort.substring(0, sep)
+    val port = hostAndPort.substring(sep + 1)
+    val default =
+        when (scheme?.lowercase()) {
+            "https" -> "443"
+            "http" -> "80"
+            else -> null
+        }
+    return if (port.isEmpty() || port == default) host else "$host:$port"
+}
+
+/**
+ * Whether a navigation stays in the app.
  *
- * An empty [allowed] means the app deliberately declined confinement — every
- * navigation stays in-app, which is what a viewer whose pages never link outward
- * wants. Otherwise the host must be listed *and* the scheme must be one the app
- * itself uses: cleartext is allowed only to an app that is already cleartext (a
- * LAN-only viewer), so an https app can never be walked down to http in place.
+ * [isMainFrame] false always stays: a sub-frame is part of the page the app is
+ * already showing, not a navigation away from it. Ejecting one would cancel the
+ * frame's load and open the phone's browser over the app, which is a far stranger
+ * outcome than whatever the frame was going to render.
+ *
+ * An empty [allowed] means the app deliberately declined confinement. Otherwise
+ * the authority must be listed *and* the scheme must be one the app itself uses:
+ * cleartext is allowed only to an app that is already cleartext (a LAN-only
+ * viewer), so an https app can never be walked down to http in place.
  */
 internal fun staysInApp(
     appUrl: String,
     allowed: Set<String>,
+    isMainFrame: Boolean,
     scheme: String?,
     host: String?,
+    port: Int,
 ): Boolean {
+    if (!isMainFrame) return true
     if (allowed.isEmpty()) return true
-    if (host == null || host !in allowed) return false
+    if (host == null) return false
+    val authority = normaliseAuthority(scheme, if (port >= 0) "$host:$port" else host)
+    if (allowed.none { normaliseAuthority(scheme, it) == authority }) return false
     return when (scheme?.lowercase()) {
         "https" -> true
         "http" -> schemeOf(appUrl) == "http"

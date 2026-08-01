@@ -16,18 +16,23 @@ data class ShellConfig(
      */
     val url: String,
     /**
-     * Hosts allowed to load inside the WebView. **Defaults to the app's own host**,
-     * so the safe case needs no thought: a chromeless view has no URL bar, and a
-     * foreign page opening in place would still look like the app. Anything not
-     * listed is handed to the real browser, where it arrives with an address bar.
+     * Authorities — `host`, or `host:port` — allowed to load inside the WebView.
+     * **Defaults to the app's own**, so the safe case needs no thought: a
+     * chromeless view has no URL bar, and a foreign page opening in place would
+     * still look like the app. Anything not listed is handed to the real browser,
+     * where it arrives with an address bar.
      *
-     * An app behind a login **must list its identity provider's host** too, or the
-     * login hop itself gets ejected to the browser and the app can never sign in.
+     * The port counts, and it is the app's own port that the default carries: on a
+     * box running several of the fleet's services, a host-only rule would let every
+     * neighbour open in place. A bare host means the scheme's default port.
+     *
+     * An app behind a login **must list its identity provider** too, or the login
+     * hop itself gets ejected to the browser and the app can never sign in.
      *
      * Passing `emptySet()` declines confinement entirely — every navigation stays
      * in-app. That is a deliberate, visible choice, not the default it used to be.
      */
-    val allowedHosts: Set<String> = setOfNotNull(hostOf(url)),
+    val allowedHosts: Set<String> = setOfNotNull(authorityOf(url)),
     /**
      * logcat tag to mirror the page's `console.*` to, or null to leave the web
      * console invisible. Without this a wrapper carrying only a `WebViewClient`
