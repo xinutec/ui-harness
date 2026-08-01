@@ -50,6 +50,12 @@ compile, which is how thoth's packaged build failed (2026-08-01). Shipping the
 sources costs a few kB and makes "install without running my code, then build it
 yourself" a supported path rather than a dead end.
 
+For the same reason `@types/node` is a real **dependency**, not a devDependency:
+`src/serve.ts` uses `process` and `node:` imports, so it is needed to COMPILE
+the package, and a consumer building from source gets nothing from a dev-only
+declaration. `@playwright/test` stays a peer — only *types* are imported from
+it, and a second copy of the runner makes every suite report "No tests found".
+
 ## Consuming (per app)
 
 Installed as a **public git dependency** — anonymous `https` clone, no registry,

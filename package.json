@@ -44,7 +44,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "@types/node": "^24.0.0",
     "jsdom": "^30.0.1",
     "typescript": "^5.6.0",
     "vitest": "^4.1.10"
@@ -53,5 +52,8 @@
     "type": "git",
     "url": "git+https://github.com/xinutec/ui-harness.git"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@types/node": "^24.0.0"
+  }
 }
