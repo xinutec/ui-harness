@@ -1,7 +1,7 @@
 {
   "name": "@xinutec/ui-harness",
   "version": "0.1.0",
-  "description": "Shared phone-width layout checks for the fleet's Angular frontends — render in a real browser at true device geometry and assert about painted pixels, not source.",
+  "description": "The fleet's shared UI layer. This package is the web half: phone-width layout checks that render in a real browser at true device geometry and assert about painted pixels, not source. The shared Android WebView shell lives in the same repo under android/, consumed by Gradle rather than npm.",
   "type": "module",
   "exports": {
     ".": {

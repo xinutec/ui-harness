@@ -1,13 +1,31 @@
-# @xinutec/ui-harness — shared phone-width layout checks (Playwright)
+# @xinutec/ui-harness — the fleet's shared UI layer
 
-The fleet's dynamic layout-measurement layer (L2 of the layout-quality
-architecture): render a screen at true phone geometry and assert about the
-**painted pixels**, not the source. Extracted from the life app's e2e harness
-after it caught, in one week: a 497px toggle row in a 380px sheet, nested
-scrollers that broke swipe, and a suite that had silently run at 1280×720 while
-claiming 390px.
+Two halves, one repo:
 
-## Why it's a package (and why it builds to JS on install)
+- **`src/` — phone-width layout checks (Playwright).** The dynamic
+  layout-measurement layer (L2 of the layout-quality architecture): render a
+  screen at true phone geometry and assert about the **painted pixels**, not the
+  source. Consumed over npm by twelve Angular frontends.
+- **`android/` — the WebView app shell (Gradle).** The Activity every wrapper app
+  is a WebView around: system-bar insets, page-coloured bars, back through SPA
+  history, restore-on-reopen. Consumed by path, as a composite build.
+
+They share a repo because they are the same job seen from two sides — one keeps
+the web UI honest about phone geometry, the other is the frame that UI is shown
+in on a phone — and because the alternative was seven hand-maintained copies of
+one Activity, already drifting.
+
+**Neither half can disturb the other's consumers.** `files: ["dist"]` in
+`package.json` means `android/` never reaches an npm consumer's `node_modules`,
+and npm consumers pin a SHA, so an Android commit is invisible to them until they
+bump. Gradle consumers resolve by path against whatever is checked out, so a
+change to `src/` is invisible to them entirely.
+
+## Web: why it's a package (and why it builds to JS on install)
+
+Extracted from the life app's e2e harness after it caught, in one week: a 497px
+toggle row in a 380px sheet, nested scrollers that broke swipe, and a suite that
+had silently run at 1280×720 while claiming 390px.
 
 The measurement code imports only **types** from `@playwright/test` (erased at
 compile), so the built JS pulls in **no** copy of the runner — load-bearing,
