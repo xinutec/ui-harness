@@ -43,6 +43,14 @@ step "tsc build (compiles + emits the published dist/ + .d.ts)"
 # strict + declaration; the thing the apps import is what gets type-checked here.
 web npm run build
 
+step "vitest unit specs (the pure functions, in jsdom)"
+# src/*.spec.ts — the label rules and the flattener behind the shared telemetry
+# trace. They were nine near-identical spec files across the fleet before this;
+# now they run once, here. jsdom rather than a browser because a DOM API is all
+# they need, and they sit beside their source rather than in tests/, which is
+# Playwright's directory.
+web npm run test:unit
+
 step "tsc typecheck of scripts/ (noEmit)"
 # scripts/ is real code and gets the same treatment as src/. It is not covered by
 # the build above (rootDir is src/), and it used to be shell — where this fleet has

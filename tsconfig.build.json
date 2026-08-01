@@ -10,5 +10,7 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // Unit specs sit beside their source but are not part of the package.
+  "exclude": ["src/**/*.spec.ts"]
 }

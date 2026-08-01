@@ -15,6 +15,10 @@
     "./serve": {
       "types": "./dist/serve.d.ts",
       "default": "./dist/serve.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "default": "./dist/telemetry.js"
     }
   },
   "types": "./dist/ui-harness.d.ts",
@@ -25,15 +29,38 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "test": "playwright test",
+    "test:unit": "vitest run",
     "prepare": "npm run build"
   },
   "peerDependencies": {
-    "@playwright/test": ">=1.61.0"
+    "@angular/core": ">=20",
+    "@angular/router": ">=20",
+    "@playwright/test": ">=1.61.0",
+    "rxjs": ">=7"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": true
+    },
+    "@angular/router": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "rxjs": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@angular/core": "^22.0.0",
+    "@angular/router": "^22.0.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^24.0.0",
-    "typescript": "^5.6.0"
+    "jsdom": "^30.0.1",
+    "rxjs": "^7.8.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
   },
   "repository": {
     "type": "git",
