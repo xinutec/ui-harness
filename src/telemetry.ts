@@ -1,29 +1,27 @@
 /**
- * The fleet's client activity trace, in one place.
+ * The fleet's client activity trace — the policy half, with no framework in it.
  *
- * Every Angular app in the fleet carried its own copy of this file — ten of
- * them, 1,301 lines, all exporting the same two symbols and drifted 38 to 98
- * lines apart. The constants, the endpoint, the two capture seams and the flush
- * policy were identical in all ten; the only real variation was how the batch
- * got posted, and that turned out to be three spellings of the same POST.
+ * Every Angular app in the fleet carried its own copy of this — ten of them,
+ * 1,301 lines, all exporting the same two symbols and drifted 38 to 98 lines
+ * apart. The flush cadence, the queue cap, the endpoint and both capture seams
+ * were identical in all ten; the only real variation was how the batch got
+ * posted, and the four API wrappers doing that turned out to be
+ * `http.post('/api/telemetry', events)` verbatim — three spellings of one POST.
  *
- * What the trace is for: the per-request log records every API call, and that
- * reads as sufficient until something goes wrong. It is not — a tap that hits a
- * cache, a control that was disabled, a screen that rendered wrong: none of it
- * reaches the server, so "I pressed it and nothing happened" is undiagnosable.
- * Read together, the two streams make it answerable.
+ * **Why this is a plain class and not an `@Injectable` service.** It was one,
+ * briefly, and a production build of the first consumer died on `JIT compiler
+ * unavailable`. Angular's decorators need the Angular compiler to emit their
+ * Ivy definitions; this package is built by plain `tsc`, so a decorated class
+ * leaving it carries only inert metadata that an AOT build cannot instantiate.
+ * Shipping an Angular service from here would mean adopting ng-packagr and the
+ * Angular Package Format for the whole package. The framework binding is about
+ * a dozen lines per app and the policy below is a hundred and thirty, so the
+ * boundary goes where the volume is: apps keep a thin `@Injectable` adapter,
+ * and this owns everything it can own without knowing what a Router is.
  *
- * Instrumented once, at two central seams — the router's navigation events and
- * a single capture-phase click listener — so no screen knows this exists and no
- * new control can be missed by forgetting to annotate it.
- *
- * The pure half lives in `./telemetry-label`; it is re-exported here so a
- * consumer has one import site.
+ * The pure label rules live in `./telemetry-label` and are re-exported here so
+ * a consumer has one import site.
  */
-
-import { DOCUMENT, InjectionToken, Injectable, inject, type OnDestroy } from '@angular/core';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter } from 'rxjs';
 
 import { type TelemetryEvent, labelFor, oneLine } from './telemetry-label.js';
 
@@ -43,12 +41,10 @@ export interface TelemetryConfig {
    *
    * Exists for memview, whose requests carry an `X-Share-Token` when the page
    * is being read through a share link rather than a session. A function, not
-   * a value, because the token can appear or change after `init()`.
+   * a value, because the token can appear or change after `start()`.
    */
   headers?: () => Record<string, string>;
 }
-
-export const TELEMETRY_CONFIG = new InjectionToken<TelemetryConfig>('TELEMETRY_CONFIG');
 
 const DEFAULTS = {
   endpoint: '/api/telemetry',
@@ -57,6 +53,8 @@ const DEFAULTS = {
 } as const;
 
 /**
+ * Queue, flush policy and transport for the activity trace.
+ *
  * Best-effort by design: a failed send is dropped, never retried, never
  * surfaced. A trace that interferes with the app it observes is worse than no
  * trace at all.
@@ -76,77 +74,72 @@ const DEFAULTS = {
  * interceptor to authenticate. Anything a request genuinely needs goes through
  * `TelemetryConfig.headers`.
  */
-@Injectable({ providedIn: 'root' })
-export class Telemetry implements OnDestroy {
-  private readonly router = inject(Router);
-  private readonly doc = inject(DOCUMENT);
-  private readonly config = inject(TELEMETRY_CONFIG, { optional: true }) ?? {};
-
+export class TelemetryCore {
   private queue: TelemetryEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  private get endpoint(): string {
-    return this.config.endpoint ?? DEFAULTS.endpoint;
+  constructor(
+    private readonly doc: Document,
+    private readonly config: TelemetryConfig = {},
+  ) {}
+
+  /** Whether `start()` has already run — what makes an adapter's `init()`
+   *  idempotent without the adapter tracking anything itself. */
+  get started(): boolean {
+    return this.timer !== null;
   }
 
-  /** Wire the two capture points. Called once from the app shell; idempotent. */
-  init(): void {
+  /**
+   * Begin flushing, and take a last flush when the page is hidden — a tab being
+   * closed, or a WebView being frozen by Android's cached-app freezer — so the
+   * final few events are not stranded in the queue.
+   *
+   * The two capture seams stay with the caller: they are the framework's, and
+   * not knowing about them is the whole point of this class.
+   */
+  start(): void {
     if (this.timer !== null) return;
-
-    this.router.events
-      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe((e) => this.enqueue('nav', e.urlAfterRedirects, null));
-
-    // Capture phase, so the tap is seen even where a handler stops propagation.
-    this.doc.addEventListener(
-      'click',
-      (ev) => {
-        const label = labelFor(ev.target);
-        if (label !== null) this.enqueue('tap', this.router.url, label);
-      },
-      { capture: true },
-    );
-
     this.timer = setInterval(() => this.flush(false), this.config.flushMs ?? DEFAULTS.flushMs);
-
-    // A last flush when the page is hidden — a tab being closed, or a WebView
-    // being frozen by Android's cached-app freezer — so the final few events
-    // are not stranded in the queue.
     this.doc.addEventListener('visibilitychange', () => {
       if (this.doc.visibilityState === 'hidden') this.flush(true);
     });
   }
 
-  ngOnDestroy(): void {
+  stop(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
   }
 
-  private enqueue(kind: string, path: string, label: string | null): void {
+  /** Record one action. `label` is null for a navigation. */
+  record(kind: string, path: string, label: string | null): void {
     this.queue.push({ kind, path: oneLine(path), label, at: Date.now() });
     if (this.queue.length >= (this.config.maxQueue ?? DEFAULTS.maxQueue)) this.flush(false);
   }
 
-  private flush(final: boolean): void {
+  /** Record a tap, if it landed on something a person meant to press. */
+  recordTap(target: EventTarget | null, path: string): void {
+    const label = labelFor(target);
+    if (label !== null) this.record('tap', path, label);
+  }
+
+  flush(final: boolean): void {
     if (this.queue.length === 0) return;
     const batch = this.queue;
     this.queue = [];
     const body = JSON.stringify(batch);
+    const endpoint = this.config.endpoint ?? DEFAULTS.endpoint;
 
     // On hiding, `sendBeacon` survives a teardown an in-flight request would
     // not. It cannot carry headers, so an app that needs them keeps the normal
     // path and accepts losing the last partial batch rather than sending one
     // that will be refused.
-    const beacon = this.doc.defaultView?.navigator.sendBeacon;
-    if (final && beacon && !this.config.headers) {
-      this.doc.defaultView?.navigator.sendBeacon(
-        this.endpoint,
-        new Blob([body], { type: 'application/json' }),
-      );
+    const view = this.doc.defaultView;
+    if (final && view?.navigator.sendBeacon && !this.config.headers) {
+      view.navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
       return;
     }
 
-    void fetch(this.endpoint, {
+    void fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(this.config.headers?.() ?? {}) },
       body,
