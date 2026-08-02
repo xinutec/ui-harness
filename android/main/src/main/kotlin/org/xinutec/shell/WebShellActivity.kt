@@ -282,7 +282,16 @@ abstract class WebShellActivity : ComponentActivity() {
         // theme, so read its body background.
         override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
-            view.evaluateJavascript("getComputedStyle(document.body).backgroundColor") { result ->
+            // Guarded, because a page that failed to load still finishes: Chromium's
+            // own error page has no `body`, so the unguarded read threw a TypeError
+            // that surfaced through onConsoleMessage as an app error. Harmless, and
+            // it appears at exactly the moment somebody is reading the log to find
+            // out why the page did not load — which is the worst time for a red
+            // herring. `null` here is already the "keep the colour you have" answer
+            // (see parseRgb).
+            view.evaluateJavascript(
+                "document.body ? getComputedStyle(document.body).backgroundColor : null",
+            ) { result ->
                 parseCssColor(result)?.let(root::setBackgroundColor)
             }
         }
