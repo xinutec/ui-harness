@@ -1,5 +1,5 @@
-import { createServer, type Server } from "node:http";
 import { readFile, stat } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { HarnessSpec } from "./config.js";

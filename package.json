@@ -25,11 +25,13 @@
   "files": [
     "dist",
     "src",
+    "tsconfig.json",
     "tsconfig.build.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
     "test": "playwright test",
     "test:unit": "vitest run",
     "prepare": "npm run build"
@@ -43,6 +45,7 @@
     }
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.6",
     "@playwright/test": "^1.61.1",
     "jsdom": "^30.0.1",
     "typescript": "^5.6.0",

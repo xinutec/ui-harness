@@ -1,14 +1,13 @@
 {
+  "// why": "The emit path: what `npm run build` compiles into the published dist/. Everything about how strictly it is checked comes from tsconfig.json, which governs the whole repo — this file only says what to emit and where, so the published package can never be checked differently from the source it is built from.",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "verbatimModuleSyntax": true
+    "noEmit": false,
+    // Emitted JS cannot resolve a `.ts` specifier; only the noEmit parent may.
+    "allowImportingTsExtensions": false
   },
   "include": ["src/**/*.ts"],
   // Unit specs sit beside their source but are not part of the package.

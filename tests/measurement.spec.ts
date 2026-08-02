@@ -1,15 +1,28 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
-  findTextOverlaps,
+  expectViewportIsPhone,
+  findCanvasContrast,
+  findClippedIcons,
+  findClippedText,
   findHorizontalOverflow,
   findOccludedControls,
-  findClippedText,
-  findClippedIcons,
-  findCanvasContrast,
-  expectViewportIsPhone,
+  findTextOverlaps,
   swipeUp,
 } from '../src/ui-harness';
 
+/**
+ * The first result, asserted present.
+ *
+ * A spec that reads `measured[0].ratio` is really asserting two things: that a
+ * measurement came back at all, and what it says. `noUncheckedIndexedAccess`
+ * makes the first one explicit, and failing on "got none" beats failing on a
+ * property of undefined three lines later.
+ */
+const first = <T>(xs: readonly T[]): T => {
+  const [x] = xs;
+  if (x === undefined) throw new Error('expected at least one result, got none');
+  return x;
+};
 
 /** setContent replaces the whole document — without a viewport meta, mobile
  *  emulation falls back to the 980px legacy layout width and nothing measures
@@ -105,7 +118,11 @@ test('does NOT flag text scrolled out of a scroller — it can be scrolled back'
     <div id="s" style="overflow-y: auto; height: 40px; font: 16px sans-serif;">
       <p>one</p><p>two</p><p>three</p><p>four</p><p>five</p></div>`));
   await page.evaluate(() => {
-    const s = document.getElementById('s')!;
+    const s = document.getElementById('s');
+    // The fixture above defines it; if that ever stops being true the spec
+    // should say so, not scroll nothing and then assert an empty result —
+    // which is the answer it expects anyway, so it would pass for free.
+    if (!s) throw new Error('fixture is missing #s');
     s.scrollTop = Math.floor((s.scrollHeight - s.clientHeight) / 2);
   });
   const clips = await page.evaluate(findClippedText, [null, 3] as [string | null, number]);
@@ -151,8 +168,8 @@ test('detects text clipped off the LEFT edge', async ({ page }) => {
     string[],
   ]);
   expect(res.offenders.length).toBeGreaterThan(0);
-  expect(res.offenders[0].side).toBe('left');
-  expect(res.offenders[0].text).toContain('energetic');
+  expect(first(res.offenders).side).toBe('left');
+  expect(first(res.offenders).text).toContain('energetic');
 });
 
 test('an off-canvas drawer (visibility:hidden) is NOT flagged as clipped left', async ({ page }) => {
@@ -326,8 +343,8 @@ test('flags marks that are invisible against the page behind them', async ({ pag
   );
   const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
   expect(measured).toHaveLength(1);
-  expect(measured[0].painted).toBeGreaterThan(200);
-  expect(measured[0].ratio).toBeLessThan(3);
+  expect(first(measured).painted).toBeGreaterThan(200);
+  expect(first(measured).ratio).toBeLessThan(3);
 });
 
 test('passes marks that contrast with the page', async ({ page }) => {
@@ -338,7 +355,7 @@ test('passes marks that contrast with the page', async ({ page }) => {
     `),
   );
   const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
-  expect(measured[0].ratio).toBeGreaterThan(3);
+  expect(first(measured).ratio).toBeGreaterThan(3);
 });
 
 test('measures against the nearest opaque ancestor, not a transparent body', async ({ page }) => {
@@ -353,14 +370,14 @@ test('measures against the nearest opaque ancestor, not a transparent body', asy
     ),
   );
   const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
-  expect(measured[0].backdrop).toBe('rgb(255, 255, 255)');
-  expect(measured[0].ratio).toBeGreaterThan(3);
+  expect(first(measured).backdrop).toBe('rgb(255, 255, 255)');
+  expect(first(measured).ratio).toBeGreaterThan(3);
 });
 
 test('reports an unpainted canvas rather than scoring it', async ({ page }) => {
   await page.setContent(canvasPage(''));
   const measured = await page.evaluate(findCanvasContrast, ['canvas', 200] as [string, number]);
-  expect(measured[0].painted).toBe(0);
+  expect(first(measured).painted).toBe(0);
 });
 
 /** A `mat-icon` as Angular Material ships it: fixed 24px box, clipping overflow,
@@ -382,8 +399,8 @@ test('detects an icon squeezed below its glyph by a long flex sibling', async ({
   );
   const clips = await page.evaluate(findClippedIcons, [null, 1] as [string | null, number]);
   expect(clips.map((c) => c.icon)).toEqual(['hourglass_top']);
-  expect(clips[0].painted).toBeLessThan(20);
-  expect(clips[0].glyph).toBe(24);
+  expect(first(clips).painted).toBeLessThan(20);
+  expect(first(clips).glyph).toBe(24);
 });
 
 test('does NOT flag the same row once the icon is told not to shrink', async ({ page }) => {

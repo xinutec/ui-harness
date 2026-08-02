@@ -27,15 +27,17 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
       # The pure functions in jsdom. Cheap, and they fail for different reasons
       # than the Playwright specs — a label rule can be wrong with every painted
       # pixel still in the right place.
       - run: npm run test:unit
-      # scripts/ is real code and is not covered by the build above (rootDir is
-      # src/). It used to be shell, where a silent substitution bug in
-      # bump-consumers rewrote a lockfile without its manifest.
-      - run: npm run typecheck:scripts
+      # src/ + tests/ + scripts/, under the root tsconfig.json. The build above
+      # covers src/ only. scripts/ is real code that used to be shell, where a
+      # silent substitution bug in bump-consumers rewrote a lockfile without its
+      # manifest.
+      - run: npm run typecheck
       - run: npx playwright install --with-deps chromium
       - run: npm test
 

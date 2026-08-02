@@ -23,7 +23,7 @@
  * a consumer has one import site.
  */
 
-import { type TelemetryEvent, labelFor, oneLine } from './telemetry-label.js';
+import { labelFor, oneLine, type TelemetryEvent } from './telemetry-label.js';
 
 export { labelFor, oneLine, type TelemetryEvent } from './telemetry-label.js';
 

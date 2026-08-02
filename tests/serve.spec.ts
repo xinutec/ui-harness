@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Server } from 'node:http';
+import { expect, test } from '@playwright/test';
 import { startServer } from '../src/serve';
 
 /**

@@ -86,7 +86,9 @@ export function labelFor(node: EventTarget | null): string | null {
   const clone = el.cloneNode(true);
   let text = '';
   if (clone instanceof Element) {
-    clone.querySelectorAll('mat-icon, [aria-hidden="true"]').forEach((n) => n.remove());
+    clone.querySelectorAll('mat-icon, [aria-hidden="true"]').forEach((n) => {
+      n.remove();
+    });
     text = (clone.textContent ?? '').replace(/\s+/g, ' ').trim();
   }
   if (text) return oneLine(text);

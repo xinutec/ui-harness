@@ -59,12 +59,21 @@ step "vitest unit specs (the pure functions, in jsdom)"
 # Playwright's directory.
 web npm run test:unit
 
-step "tsc typecheck of scripts/ (noEmit)"
-# scripts/ is real code and gets the same treatment as src/. It is not covered by
-# the build above (rootDir is src/), and it used to be shell — where this fleet has
-# no gate at all, and where bump-consumers shipped a silent substitution bug that
-# rewrote a lockfile without its manifest.
-web npm run typecheck:scripts
+step "biome (lint only)"
+# The formatter stays off: src/ is tab-indented and tests/ two-space, and picking
+# one is a decision about style, not correctness. The linter is here because
+# DL-TS-STRINGIFY-GUARD wants `noBaseToString` — nothing in this repo banned the
+# default object stringification that renders `[object Object]` in a UI.
+web npm run lint
+
+step "tsc typecheck of the whole repo (noEmit)"
+# The build above covers src/ only (rootDir), and under a config that emits. This
+# is tsconfig.json, which governs src/ AND tests/ AND scripts/ — the last of which
+# is real code that used to be shell, where bump-consumers shipped a silent
+# substitution bug that rewrote a lockfile without its manifest. It is also the
+# config dev-lint's node-checks builds its TS Program from: no root tsconfig.json
+# meant all 36 typed rules skipped every file in this repo.
+web npm run typecheck
 
 step "playwright fixture specs (measurement fns @ phone geometry)"
 # The specs in tests/ exercise the measurement functions against setContent DOM at

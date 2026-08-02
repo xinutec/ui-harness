@@ -119,10 +119,12 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 	}
 
 	const pairs: OverlapPair[] = [];
-	for (let i = 0; i < rects.length; i++) {
+	for (const [i, a] of rects.entries()) {
 		for (let j = i + 1; j < rects.length; j++) {
-			const a = rects[i];
 			const b = rects[j];
+			// j is bounded by rects.length, so this cannot miss; the check is what
+			// lets the type say so, instead of an assertion claiming it.
+			if (b === undefined) continue;
 			// One text node can't collide with itself — Chrome reports an extra
 			// same-position fragment rect for ellipsized text.
 			if (a.node === b.node) continue;
@@ -208,7 +210,7 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 	const describe = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
-				? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
 				: "";
 		return el.tagName.toLowerCase() + cls;
 	};
@@ -316,7 +318,7 @@ export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
 		if (!el) return "(detached)";
 		const cls =
 			typeof el.className === "string" && el.className.trim()
-				? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
 				: "";
 		return el.tagName.toLowerCase() + cls;
 	};
@@ -447,7 +449,7 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 		allow.some((sel) => el.closest(sel) !== null);
 	const describe = (el: Element): string => {
 		const cls = typeof el.className === "string" && el.className.trim()
-			? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+			? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
 			: "";
 		return el.tagName.toLowerCase() + cls;
 	};
@@ -575,7 +577,7 @@ export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 	const describe = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
-				? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".")
+				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
 				: "";
 		return el.tagName.toLowerCase() + cls;
 	};
@@ -774,16 +776,16 @@ export function findCanvasContrast([selector, minAlpha]: [string, number]): Canv
 	const luminance = (r: number, g: number, b: number): number => {
 		const channel = (v: number): number => {
 			const s = v / 255;
-			return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+			return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 		};
 		return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 	};
 	const parse = (css: string): [number, number, number] | null => {
-		const n = css.match(/[\d.]+/g)?.map(Number);
-		if (!n || n.length < 3) return null;
+		const [r, g, b, alpha] = css.match(/[\d.]+/g)?.map(Number) ?? [];
+		if (r === undefined || g === undefined || b === undefined) return null;
 		// A fully transparent colour tells us nothing about what shows through.
-		if (n.length > 3 && n[3] === 0) return null;
-		return [n[0], n[1], n[2]];
+		if (alpha === 0) return null;
+		return [r, g, b];
 	};
 	/** The first opaque background painted behind `el` — NOT document.body,
 	 *  which is transparent in several fleet apps and would score every mark
@@ -813,20 +815,32 @@ export function findCanvasContrast([selector, minAlpha]: [string, number]): Canv
 		const [br, bg, bb] = backdropOf(el);
 		const back = luminance(br, bg, bb);
 		const ratios: number[] = [];
-		for (let i = 0; i < data.length; i += 4) {
+		for (let i = 0; i + 3 < data.length; i += 4) {
+			const r = data[i];
+			const g = data[i + 1];
+			const b = data[i + 2];
+			const alpha = data[i + 3];
+			// The bound above makes a short read impossible; the check is what lets
+			// the types say so. Without it `data[i + 3] < minAlpha` compared
+			// `undefined`, which is false, and fed NaN into the luminance.
+			if (r === undefined || g === undefined || b === undefined || alpha === undefined)
+				continue;
 			// Solidly painted pixels only — antialiased glyph edges and
 			// deliberately faint strokes blend toward the backdrop by design and
 			// would drag the measurement down.
-			if (data[i + 3] < minAlpha) continue;
-			const l = luminance(data[i], data[i + 1], data[i + 2]);
+			if (alpha < minAlpha) continue;
+			const l = luminance(r, g, b);
 			const [hi, lo] = l > back ? [l, back] : [back, l];
 			ratios.push((hi + 0.05) / (lo + 0.05));
 		}
 		ratios.sort((a, b) => a - b);
+		// floor(len * 0.9) < len for every len ≥ 1, so this misses only when
+		// nothing was painted — which is the case the 0 is for.
+		const p90 = ratios[Math.floor(ratios.length * 0.9)];
 		out.push({
 			index,
 			painted: ratios.length,
-			ratio: ratios.length ? ratios[Math.floor(ratios.length * 0.9)] : 0,
+			ratio: p90 ?? 0,
 			backdrop: `rgb(${br}, ${bg}, ${bb})`,
 		});
 	});

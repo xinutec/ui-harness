@@ -1,5 +1,4 @@
-import { test, expect } from '@playwright/test';
-import { devices } from '@playwright/test';
+import { devices, expect, test } from '@playwright/test';
 import { phoneConfig, portFor } from '../src/config';
 
 /**

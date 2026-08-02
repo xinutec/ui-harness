@@ -1,0 +1,21 @@
+{
+  "// why": "One config that governs the WHOLE repo — src/, its specs, tests/ and scripts/ — type-checked only. tsconfig.build.json is the emit path and extends this. Two things depend on a root tsconfig.json existing: dev-lint's node-checks builds its TS Program from `tsconfig.app.json` or `tsconfig.json` (lib/program.mjs), so before this file all 36 typed rules skipped every file in the repo and said so on every run; and DL-STRINGIFY-GUARD treats a directory with one as a TypeScript project. Twelve frontends import src/ — it should be the most checked code here, not the least.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "*.config.ts"
+  ]
+}
