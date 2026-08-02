@@ -1,22 +1,53 @@
-# Gate: the harness's own fixture specs (tests/) exercise the measurement
-# functions against setContent DOM at phone geometry, plus the TS build compiles.
-# Five apps ride on these functions — a red run here means a real regression.
+# Gate: everything in scripts/verify.sh that does not need the Android SDK.
+#
+# The web half — the harness's own fixture specs (tests/) exercise the
+# measurement functions against setContent DOM at phone geometry, the unit specs
+# cover the pure functions, and the TS build compiles. Twelve Angular frontends
+# ride on these functions; a red run here is a real regression in all of them.
+#
+# The Android half — ktlint over android/. Eight WebView wrappers ride on the
+# shell, and until 2026-08-02 nothing in CI looked at its Kotlin at all: the
+# gate existed only in scripts/verify.sh, which CI never called. The shell's
+# Gradle unit tests and the life consumer APK still need the unfree SDK and stay
+# local; ktlint does not, so it runs here.
 name: ci
 on:
   push:
     branches: ['**']
   pull_request:
 jobs:
-  test:
+  web:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
+          cache: npm
       - run: npm ci
+      - run: npm run build
+      # The pure functions in jsdom. Cheap, and they fail for different reasons
+      # than the Playwright specs — a label rule can be wrong with every painted
+      # pixel still in the right place.
+      - run: npm run test:unit
+      # scripts/ is real code and is not covered by the build above (rootDir is
+      # src/). It used to be shell, where a silent substitution bug in
+      # bump-consumers rewrote a lockfile without its manifest.
+      - run: npm run typecheck:scripts
       - run: npx playwright install --with-deps chromium
       - run: npm test
-      - run: npm run build
+
+  kotlin:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # `.#ktlint` is ktlint and nothing else — deliberately not `.#android`,
+      # which would pull the whole unfree SDK onto the runner to check
+      # formatting. Same shell scripts/verify.sh uses, so local and CI cannot
+      # disagree about which ktlint ran.
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop .#ktlint --command ktlint "android/main/src/**/*.kt" "android/*.kts"

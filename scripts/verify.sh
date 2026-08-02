@@ -5,8 +5,12 @@
 # Run it the same way everywhere so local-green and CI-green can't diverge:
 #   - by hand:   scripts/verify.sh
 #   - pre-commit:  scripts/githooks/pre-commit calls it (see scripts/setup-hooks.sh)
-#   - CI:        .github/workflows/ci.yml runs the node steps only — no Android SDK
-#                on the runner, and nothing in the fleet builds Android in CI
+#   - CI:        .github/workflows/ci.yml runs every step that does not need the
+#                Android SDK — the node half plus ktlint. The SDK steps (the
+#                shell's unit tests, the life consumer APK) stay local: nothing
+#                in the fleet builds Android in CI. Keep the two in step; CI
+#                silently running a subset of this file is how android/ went
+#                ungated in CI from the day it was added until 2026-08-02.
 #
 # Twelve Angular frontends ride on this package — on its measurement functions
 # and, since the config was modelled here, on their Playwright config and static
@@ -25,6 +29,10 @@ step() { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 # kind of local-green/CI-red gap this file exists to prevent.
 web() { nix develop .#default --command "$@"; }
 android() { nix develop .#android --command "$@"; }
+# ktlint gets its own shell rather than borrowing .#android's copy: CI runs this
+# step and must not drag the unfree SDK in to do it, and a gate that used a
+# different ktlint locally than in CI is the divergence this file exists to stop.
+lint() { nix develop .#ktlint --command "$@"; }
 
 step "npm ci (clean install from the lockfile)"
 # Deterministic install: fails if package.json and package-lock.json disagree.
@@ -71,7 +79,7 @@ step "ktlint (android/)"
 # dev-lint's DL-KTLINT discovers apps by <module>/app/src/main/AndroidManifest.xml,
 # which a library module has none of — so the shell would otherwise be the one
 # Kotlin in the fleet with no formatting gate. Same .editorconfig as every app.
-android ktlint "android/main/src/**/*.kt" "android/*.kts"
+lint ktlint "android/main/src/**/*.kt" "android/*.kts"
 
 step "shell unit tests (org.xinutec:shell)"
 # Restore's predicate, host confinement, and the CSS-colour parse — the pieces of

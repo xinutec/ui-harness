@@ -55,6 +55,12 @@
         # The shared WebView shell (android/). Build + test it standalone with:
         #   nix develop .#android --command ./android/gradlew -p android :main:test
         android = androidShell system;
+
+        # ktlint alone — the Kotlin formatting gate without the unfree Android
+        # SDK behind it. `.#android` also carries ktlint, but pulling a whole
+        # SDK onto a CI runner to check formatting is the reason the Kotlin had
+        # no CI gate at all; this shell is what makes that gate affordable.
+        ktlint = pkgs.mkShell { packages = [ pkgs.ktlint ]; };
       });
     };
 }
