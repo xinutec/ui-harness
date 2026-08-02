@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { startServer } from '../src/serve';
+import { explain, startServer } from '../src/serve';
 
 /**
  * The static server, against a real bundle-shaped directory.
@@ -96,4 +96,36 @@ test('a bundle that has not been built yet 404s rather than serving nothing', as
   const res = await fetch(`http://localhost:${port}/`);
   expect(res.status).toBe(404);
   await new Promise<void>((ok) => missing.close(() => ok()));
+});
+
+/**
+ * `explain` — the sentence printed when the harness spec won't load. It exists
+ * because `String(err)` renders every non-`Error` throw as "[object Object]",
+ * which is the one moment a person needs to be told what actually went wrong.
+ */
+
+test('a failed import reports its message, not its stack of node internals', () => {
+  const err = new Error("Cannot find module '/app/e2e/harness.mjs'");
+  expect(explain(err)).toBe("Cannot find module '/app/e2e/harness.mjs'");
+});
+
+test('the cause carries the real reason and is kept', () => {
+  const err = new Error('Failed to load spec', { cause: new Error('Unexpected token }') });
+  expect(explain(err)).toBe('Failed to load spec (Unexpected token })');
+});
+
+test('a thrown object says what it is instead of [object Object]', () => {
+  // `String(...)` on this same value is "[object Object]" — the whole reason the
+  // helper exists. Not asserted here because biome's noBaseToString rejects
+  // writing it, which is the rule agreeing with the premise.
+  expect(explain({ code: 'ERR_MODULE_NOT_FOUND' })).toBe('{"code":"ERR_MODULE_NOT_FOUND"}');
+});
+
+test('a thrown string is already the sentence', () => {
+  expect(explain('no spec here')).toBe('no spec here');
+});
+
+test('an unserialisable throw still prints something', () => {
+  expect(explain(undefined)).toBe('an unprintable value was thrown');
+  expect(explain(() => 1)).toBe('an unprintable value was thrown');
 });

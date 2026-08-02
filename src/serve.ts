@@ -122,6 +122,24 @@ export function serve(spec: HarnessSpec): Promise<Server> {
  * working directory and serve it. No arguments: the app name is in the spec and
  * the port follows from it, so there is no number to pass and none to get wrong.
  */
+/**
+ * The one sentence to print for a caught `unknown`. A failed dynamic import
+ * usually throws an `Error` whose `message` is the whole story ("Cannot find
+ * module …", or the spec's own syntax error), and whose stack is all node
+ * internals — so `message` is what's worth showing. `String(err)` is not the
+ * shortcut it looks like: anything thrown that isn't an `Error` renders as
+ * "[object Object]", which is exactly the case where you most need to be told
+ * what happened.
+ */
+export function explain(err: unknown): string {
+	if (err instanceof Error) {
+		const cause = err.cause instanceof Error ? ` (${err.cause.message})` : "";
+		return err.message + cause;
+	}
+	if (typeof err === "string") return err;
+	return JSON.stringify(err) ?? "an unprintable value was thrown";
+}
+
 async function main(): Promise<void> {
 	const specPath = join(process.cwd(), "e2e", "harness.mjs");
 	let mod: { default?: HarnessSpec };
@@ -131,7 +149,7 @@ async function main(): Promise<void> {
 		console.error(
 			`ui-harness: could not load ${specPath}\n` +
 				"Run this from the frontend directory; the app's harness spec lives there.\n" +
-				String(err),
+				explain(err),
 		);
 		process.exit(2);
 	}
