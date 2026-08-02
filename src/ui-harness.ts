@@ -30,6 +30,14 @@ class LayoutError extends Error {
  * Change here → run this package's own fixture specs (npm test) — five
  * apps ride on these functions.
  *
+ * Every `find*` below is serialised by `page.evaluate` and re-parsed inside the
+ * browser, so it closes over NOTHING from this module — only its `args`. That is
+ * why the small `describe(el)` selector helper is written out again in each of
+ * them rather than hoisted: a shared one would be out of scope in the page and
+ * throw `ReferenceError` at the first offender it tried to name. Hoisting it
+ * would need a string prelude injected per evaluate, which costs more than the
+ * copies do.
+ *
  * The core signal is text-on-text collision. In a correct layout, no two
  * pieces of text ever share the same pixels. We measure each piece of
  * rendered text at the glyph level — `Range.getClientRects()` returns one
