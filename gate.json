@@ -1,0 +1,186 @@
+{
+  "checks": [
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "ci"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "npm ci (clean install from the lockfile)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "run",
+        "git+file:../dev-lint?ref=HEAD",
+        "--",
+        "."
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "dev-lint (shared rules, whole repo)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "tsc build (emits the published dist/ + .d.ts)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "run",
+        "test:unit"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "vitest unit specs",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "run",
+        "lint"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "biome (lint)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "tsc typecheck (whole repo, noEmit)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npx",
+        "playwright",
+        "install",
+        "chromium"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "playwright chromium is installed",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--command",
+        "npm",
+        "test"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "playwright fixture specs (measurement fns @ phone geometry)",
+      "timeout_s": 1800
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#ktlint",
+        "--command",
+        "ktlint",
+        "android/main/src/**/*.kt",
+        "android/*.kts"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "ktlint (android/)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#android",
+        "--command",
+        "./android/gradlew",
+        "-p",
+        "android",
+        "--console=plain",
+        ":main:test"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "shell unit tests (org.xinutec:shell)",
+      "timeout_s": 1800
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#android",
+        "--command",
+        "../life/android/gradlew",
+        "-p",
+        "../life/android",
+        "--console=plain",
+        ":app:assembleDebug"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "life built against the shell (the demanding consumer)",
+      "timeout_s": 1800
+    },
+    {
+      "argv": [
+        "nix",
+        "run",
+        "../dev-lint#gate",
+        "--",
+        "--check-table",
+        "gate.dhall",
+        "gate.json"
+      ],
+      "cwd": ".",
+      "env": {},
+      "name": "the table matches its Dhall",
+      "timeout_s": 120
+    }
+  ],
+  "name": "ui-harness"
+}

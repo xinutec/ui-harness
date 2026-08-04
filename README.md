@@ -231,7 +231,13 @@ memview, messages, observe, recall, thoth, utterance) and all of them now take
 their config from it, so a change here lands everywhere at once — run their
 `ui-check` after anything that touches `config.ts` or `serve.ts`.
 
-`scripts/verify.sh` covers both halves and is what the pre-commit hook runs: the
-npm build and specs, then the shell's unit tests and an `assembleDebug` of life
-against it. Eight apps ride on the Android half, so a red run there is a real
-regression in every one of them.
+`gate.dhall` covers both halves and is what the pre-commit hook runs — twelve
+named checks: the npm build and specs, then the shell's unit tests and an
+`assembleDebug` of life against it. Run it with
+`nix run ../dev-lint#gate -- . gate.json`; each row names the dev shell it needs,
+so there is no wrapper. Eight apps ride on the Android half, so a red run there
+is a real regression in every one of them.
+
+The life consumer build is unconditional: it used to print SKIPPED when life was
+not checked out beside this repo, and a green run that skipped it is not the same
+green as one that did it.
