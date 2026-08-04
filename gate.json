@@ -5,6 +5,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "ci"
@@ -32,6 +33,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "run",
@@ -47,6 +49,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "run",
@@ -62,6 +65,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "run",
@@ -77,6 +81,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "run",
@@ -92,6 +97,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npx",
         "playwright",
@@ -108,6 +114,7 @@
         "nix",
         "develop",
         ".#default",
+        "--no-warn-dirty",
         "--command",
         "npm",
         "test"
@@ -122,6 +129,7 @@
         "nix",
         "develop",
         ".#ktlint",
+        "--no-warn-dirty",
         "--command",
         "ktlint",
         "android/main/src/**/*.kt",
@@ -137,6 +145,7 @@
         "nix",
         "develop",
         ".#android",
+        "--no-warn-dirty",
         "--command",
         "./android/gradlew",
         "-p",
@@ -154,6 +163,7 @@
         "nix",
         "develop",
         ".#android",
+        "--no-warn-dirty",
         "--command",
         "../life/android/gradlew",
         "-p",
@@ -179,7 +189,7 @@
       "cwd": ".",
       "env": {},
       "name": "the table matches its Dhall",
-      "timeout_s": 120
+      "timeout_s": 300
     }
   ],
   "name": "ui-harness"

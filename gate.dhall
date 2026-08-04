@@ -43,17 +43,27 @@ does not need the Android SDK. CI silently running a subset of this file is how
 
 The generated `gate.json` is committed; `the table matches its Dhall` re-renders
 and diffs it, so running the gate needs no `dhall`.
+
+**The vocabulary moved into the schema.** `inDevShell`, the clippy target
+directory, the Angular worker cap, and the `ng-build` / `dev-lint` /
+`check-table` rows were spelled out here and in a dozen other tables
+identically — the duplication the shared tools were built to remove, recreated
+one level up. They are `G.` values now. Two consequences the rendered JSON
+shows: every dev-shell row gains `--no-warn-dirty`, because a gate that prints
+"Git tree is dirty" on every row of every run has trained everyone to ignore a
+warning; and dev-lint is pinned to its committed HEAD rather than run out of its
+worktree, which is what stops a neighbour's half-finished edit failing this gate
+for a reason no commit anywhere explains.
+
 -}
 
 let G = ../dev-lint/gate/schema.dhall
 
-let web = \(argv : List Text) -> [ "nix", "develop", ".#default", "--command" ] # argv
+let web = G.inShell ".#default"
 
-let android =
-      \(argv : List Text) -> [ "nix", "develop", ".#android", "--command" ] # argv
+let android = G.inShell ".#android"
 
-let ktlintShell =
-      \(argv : List Text) -> [ "nix", "develop", ".#ktlint", "--command" ] # argv
+let ktlintShell = G.inShell ".#ktlint"
 
 in  { name = "ui-harness"
     , checks =
@@ -186,18 +196,6 @@ in  { name = "ui-harness"
               ]
         , timeout_s = 1800
         }
-      , G.Check::{
-        , name = "the table matches its Dhall"
-        , argv =
-            [ "nix"
-            , "run"
-            , "../dev-lint#gate"
-            , "--"
-            , "--check-table"
-            , "gate.dhall"
-            , "gate.json"
-            ]
-        , timeout_s = 120
-        }
+      , G.checkTable "../dev-lint"
       ]
     }
