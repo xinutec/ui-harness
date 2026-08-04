@@ -125,6 +125,14 @@ abstract class WebShellActivity : ComponentActivity() {
                 settings.domStorageEnabled = true // localStorage / sessionStorage
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
+                // Every app here loads one remote origin over https and nothing
+                // off the device. `allowFileAccess` defaults to *true* below API
+                // 30, and minSdk is 26 — so on an Android 8–10 phone the WebView
+                // will follow a `file://` into the app's own storage. Nothing
+                // wants that, and the way to not want it is to say so rather than
+                // to rely on nobody ever calling loadUrl with one.
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
                 webViewClient = createWebViewClient()
                 webChromeClient = createWebChromeClient()
                 // Black until the page loads and reports its surface colour; avoids
