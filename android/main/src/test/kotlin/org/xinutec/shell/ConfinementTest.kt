@@ -176,4 +176,52 @@ class ConfinementTest {
         host: String?,
         port: Int = -1,
     ) = staysInApp(app, allowed, isMainFrame = true, scheme = scheme, host = host, port = port)
+
+    // ---- sameOrigin: the test the native bridges gate on ----
+
+    @Test
+    fun `a page of the app is the app`() {
+        val app = "https://coach.xinutec.org"
+        assertTrue(sameOrigin(app, "https://coach.xinutec.org/"))
+        assertTrue(sameOrigin(app, "https://coach.xinutec.org/settings"))
+        assertTrue(sameOrigin(app, "https://coach.xinutec.org/settings?tab=1#x"))
+        // The scheme's default port is the same origin, not a second one.
+        assertTrue(sameOrigin(app, "https://coach.xinutec.org:443/settings"))
+    }
+
+    /**
+     * The reason this function exists. A prefix test says yes to a host that
+     * merely *starts* with the app's — which is a host the attacker owns, and
+     * registering one costs nothing.
+     */
+    @Test
+    fun `a look-alike host is not the app, however much of the name it shares`() {
+        val app = "https://coach.xinutec.org"
+        assertFalse(sameOrigin(app, "https://coach.xinutec.org.evil.test/"))
+        assertFalse(sameOrigin(app, "https://coach.xinutec.org.evil.test/settings"))
+        assertFalse(sameOrigin(app, "https://notcoach.xinutec.org/"))
+        assertFalse(sameOrigin(app, "https://evil.test/?x=https://coach.xinutec.org"))
+    }
+
+    @Test
+    fun `the neighbours on the same box are not the app either`() {
+        assertTrue(sameOrigin("http://192.168.1.81:8089", "http://192.168.1.81:8089/x"))
+        assertFalse(sameOrigin("http://192.168.1.81:8089", "http://192.168.1.81:8090/x"))
+        assertFalse(sameOrigin("http://192.168.1.81:8089", "http://192.168.1.81/x"))
+    }
+
+    // An https app walked down to cleartext is a different origin, and the page
+    // that answers is whoever is on the wire.
+    @Test
+    fun `the same host over cleartext is not the same origin`() {
+        assertFalse(sameOrigin("https://coach.xinutec.org", "http://coach.xinutec.org/"))
+    }
+
+    @Test
+    fun `nothing loaded yet is not the app`() {
+        assertFalse(sameOrigin("https://coach.xinutec.org", null))
+        assertFalse(sameOrigin("https://coach.xinutec.org", ""))
+        assertFalse(sameOrigin("https://coach.xinutec.org", "about:blank"))
+        assertFalse(sameOrigin("https://coach.xinutec.org", "javascript:alert(1)"))
+    }
 }

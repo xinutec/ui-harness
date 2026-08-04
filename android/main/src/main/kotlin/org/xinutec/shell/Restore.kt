@@ -27,13 +27,11 @@ object Restore {
 
     /** True if [url] is a page of the app worth reopening on. */
     fun isRestorable(base: String, url: String): Boolean {
-        val scheme = schemeOf(base) ?: return false
-        if (schemeOf(url) != scheme) return false
         // Same origin, port and all — so a look-alike host (…xinutec.org.evil.test)
         // can't pass as the app by sharing a prefix, and a neighbouring service on the
-        // same box is not the app either.
-        val authority = authorityOf(base) ?: return false
-        if (authorityOf(url) != authority) return false
+        // same box is not the app either. [sameOrigin] is that test, shared with the
+        // native bridges rather than restated here.
+        if (!sameOrigin(base, url)) return false
         // A [base] carrying a path confines to that subtree; an origin-only base (every
         // app today) confines to all of it. Tolerates a base written with or without
         // its trailing slash.

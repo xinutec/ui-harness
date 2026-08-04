@@ -73,6 +73,29 @@ internal fun normaliseAuthority(scheme: String?, hostAndPort: String): String {
 }
 
 /**
+ * Whether [url] is the same origin as [base] — scheme, host and port, which is
+ * the web platform's own definition of "the same site" and the one every other
+ * rule in this library already uses.
+ *
+ * Public because the wrappers need it too, and the alternative is each of them
+ * writing its own. coach's native bridge gated itself with
+ * `url.startsWith(BASE_URL)`, which admits `https://coach.xinutec.org.evil.test/`
+ * — a prefix is not an origin, and the host it actually names is somebody else's.
+ * That is the same mistake [Restore] used to make, described in its own doc, and
+ * a fourth hand-rolled version of "is this the app?" is how the three that exist
+ * come to disagree.
+ *
+ * A null [url] is not the app: `WebView.getUrl()` is null before the first load.
+ */
+fun sameOrigin(base: String, url: String?): Boolean {
+    if (url == null) return false
+    val scheme = schemeOf(base) ?: return false
+    if (schemeOf(url) != scheme) return false
+    val authority = authorityOf(base) ?: return false
+    return authorityOf(url) == authority
+}
+
+/**
  * Whether a navigation stays in the app.
  *
  * [isMainFrame] false always stays: a sub-frame is part of the page the app is
