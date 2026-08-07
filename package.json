@@ -8,6 +8,10 @@
       "types": "./dist/ui-harness.d.ts",
       "default": "./dist/ui-harness.js"
     },
+    "./awake": {
+      "types": "./dist/awake.d.ts",
+      "default": "./dist/awake.js"
+    },
     "./config": {
       "types": "./dist/config.d.ts",
       "default": "./dist/config.js"
