@@ -39,6 +39,7 @@ const APPS = [
 	// memview's console — a second app in that repo, and a separate entry
 	// because it is a separate bundle on a separate port.
 	"console",
+	"tasks",
 ] as const;
 
 export type AppName = (typeof APPS)[number];
