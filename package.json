@@ -38,7 +38,7 @@
     "lint": "biome check .",
     "test": "playwright test",
     "test:unit": "vitest run",
-    "prepare": "npm run build"
+    "prepare": "tsc -p tsconfig.build.json"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.61.0"

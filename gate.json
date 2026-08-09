@@ -7,12 +7,13 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
-        "ci"
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
       ],
       "cwd": ".",
       "env": {},
-      "name": "npm ci (clean install from the lockfile)",
+      "name": "pnpm install (frozen, from the lockfile)",
       "timeout_s": 900
     },
     {
@@ -35,7 +36,7 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
+        "pnpm",
         "run",
         "build"
       ],
@@ -51,7 +52,7 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
+        "pnpm",
         "run",
         "test:unit"
       ],
@@ -67,7 +68,7 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
+        "pnpm",
         "run",
         "lint"
       ],
@@ -83,7 +84,7 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
+        "pnpm",
         "run",
         "typecheck"
       ],
@@ -99,7 +100,8 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npx",
+        "pnpm",
+        "exec",
         "playwright",
         "install",
         "chromium"
@@ -116,7 +118,7 @@
         ".#default",
         "--no-warn-dirty",
         "--command",
-        "npm",
+        "pnpm",
         "test"
       ],
       "cwd": ".",

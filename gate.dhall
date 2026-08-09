@@ -67,12 +67,13 @@ let ktlintShell = G.inShell ".#ktlint"
 
 in  { name = "ui-harness"
     , checks =
-      [ {-  Deterministic install: fails if package.json and package-lock.json
-            disagree.
+      [ {-  Deterministic install: fails if package.json and pnpm-lock.yaml
+            disagree. `--frozen-lockfile` is what `npm ci` was here — it refuses
+            rather than resolving, which is the whole point of the row.
         -}
         G.Check::{
-        , name = "npm ci (clean install from the lockfile)"
-        , argv = web [ "npm", "ci" ]
+        , name = "pnpm install (frozen, from the lockfile)"
+        , argv = web [ "pnpm", "install", "--frozen-lockfile" ]
         , timeout_s = 900
         }
       , {-  Pinned to dev-lint's committed HEAD — see the header. Not
@@ -89,7 +90,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "tsc build (emits the published dist/ + .d.ts)"
-        , argv = web [ "npm", "run", "build" ]
+        , argv = web [ "pnpm", "run", "build" ]
         , timeout_s = 900
         }
       , {-  src/*.spec.ts — the label rules and the flattener behind the shared
@@ -98,7 +99,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "vitest unit specs"
-        , argv = web [ "npm", "run", "test:unit" ]
+        , argv = web [ "pnpm", "run", "test:unit" ]
         , timeout_s = 900
         }
       , {-  Lint only — the formatter stays off, because src/ is tab-indented and
@@ -109,7 +110,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "biome (lint)"
-        , argv = web [ "npm", "run", "lint" ]
+        , argv = web [ "pnpm", "run", "lint" ]
         , timeout_s = 900
         }
       , {-  The build above covers src/ only, under a config that emits. This is
@@ -122,7 +123,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "tsc typecheck (whole repo, noEmit)"
-        , argv = web [ "npm", "run", "typecheck" ]
+        , argv = web [ "pnpm", "run", "typecheck" ]
         , timeout_s = 900
         }
       , {-  Chromium comes from playwright's own cache; the install is idempotent
@@ -130,7 +131,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "playwright chromium is installed"
-        , argv = web [ "npx", "playwright", "install", "chromium" ]
+        , argv = web [ "pnpm", "exec", "playwright", "install", "chromium" ]
         , timeout_s = 900
         }
       , {-  The specs in tests/ exercise the measurement functions against
@@ -139,7 +140,7 @@ in  { name = "ui-harness"
         -}
         G.Check::{
         , name = "playwright fixture specs (measurement fns @ phone geometry)"
-        , argv = web [ "npm", "test" ]
+        , argv = web [ "pnpm", "test" ]
         , timeout_s = 1800
         }
       , {-  dev-lint's DL-KTLINT discovers apps by

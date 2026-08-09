@@ -46,9 +46,14 @@
         default = pkgs.mkShell {
           packages = [
             # TS build (tsc) + the harness's own Playwright fixture specs (tests/).
-            # Playwright's Chromium comes from its own cache (npx playwright install),
-            # same as the consuming apps — not a Nix dependency.
+            # Playwright's Chromium comes from its own cache (pnpm exec playwright
+            # install), same as the consuming apps — not a Nix dependency.
             pkgs.nodejs_24
+            # Explicit, unlike npm, which rides along with node. This repo was the
+            # fleet's last npm tree; every consumer is pnpm, and the difference
+            # was nobody's decision. Nothing here reaches a consumer — they pin a
+            # SHA and run `prepare`, which names no package manager.
+            pkgs.pnpm
           ];
         };
 

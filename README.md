@@ -62,7 +62,7 @@ Installed as a **public git dependency** — anonymous `https` clone, no registr
 no token, no `.npmrc`:
 
 ```sh
-npm i -D github:xinutec/ui-harness   # @playwright/test is a peer — apps already have it
+pnpm add -D github:xinutec/ui-harness   # @playwright/test is a peer — apps already have it
 ```
 
 ```jsonc
@@ -70,8 +70,15 @@ npm i -D github:xinutec/ui-harness   # @playwright/test is a peer — apps alrea
 "devDependencies": { "@xinutec/ui-harness": "github:xinutec/ui-harness" }
 ```
 
-In a Docker build on `node:alpine`, add git so `npm ci` can clone the dep:
-`RUN apk add --no-cache git ca-certificates && npm ci`.
+**This package imposes no package manager on you.** `dist/` is not committed, so
+your install clones the repo and runs its `prepare` — and `prepare` is
+`tsc -p tsconfig.build.json`, naming no package manager at all rather than
+`npm run build` as it did until 2026-08-09. Every consumer is on pnpm and so is
+this repo, but nothing here would break one that was not.
+
+In a Docker build on `node:alpine`, add git so the install can clone the dep:
+`RUN apk add --no-cache git ca-certificates && npm install -g pnpm && pnpm install --frozen-lockfile`
+(what `life/Dockerfile` does).
 
 ```ts
 // frontend/e2e/ui-pages.spec.ts
@@ -218,12 +225,12 @@ Full API, the manifest attributes an app still owns, and how to build it:
 
 ## Developing the harness
 
-`npm ci && npm test` runs the web half's own specs. Three kinds:
+`pnpm install --frozen-lockfile && pnpm test` runs the web half's own specs. Three kinds:
 `tests/measurement.spec.ts` — `page.setContent` DOM fixtures for the layout
 checks (ellipsis-phantom, clip-model and icon-glyph-vs-badge false positives,
 real overlap/overflow detection, the allow-list); `tests/config.spec.ts` — the
 port allocation and the shape of the config it hands out; `tests/serve.spec.ts`
-— the static server against a real bundle-shaped directory. `npm run build`
+— the static server against a real bundle-shaped directory. `pnpm run build`
 compiles `src/` → `dist/`.
 
 Twelve frontends consume this (coach, fleetwatch, gamepads, health, home, life,
@@ -232,7 +239,7 @@ their config from it, so a change here lands everywhere at once — run their
 `ui-check` after anything that touches `config.ts` or `serve.ts`.
 
 `gate.dhall` covers both halves and is what the pre-commit hook runs — twelve
-named checks: the npm build and specs, then the shell's unit tests and an
+named checks: the pnpm install, build and specs, then the shell's unit tests and an
 `assembleDebug` of life against it. Run it with
 `nix run ../dev-lint#gate -- . gate.json`; each row names the dev shell it needs,
 so there is no wrapper. Eight apps ride on the Android half, so a red run there

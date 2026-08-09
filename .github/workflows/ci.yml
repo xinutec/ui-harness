@@ -22,24 +22,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # Before setup-node, which is what this action is for: setup-node's
+      # `cache: pnpm` shells out to `pnpm store path`, so pnpm has to exist
+      # first. The major is floating rather than pinned — pinning it here would
+      # be a second version number held level with the flake's by hand, and the
+      # lockfile is the thing that actually has to match.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      # pnpm's ci: install exactly the lockfile, or fail.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run build
       # The pure functions in jsdom. Cheap, and they fail for different reasons
       # than the Playwright specs — a label rule can be wrong with every painted
       # pixel still in the right place.
-      - run: npm run test:unit
+      - run: pnpm run test:unit
       # src/ + tests/ + scripts/, under the root tsconfig.json. The build above
       # covers src/ only. scripts/ is real code that used to be shell, where a
       # silent substitution bug in bump-consumers rewrote a lockfile without its
       # manifest.
-      - run: npm run typecheck
-      - run: npx playwright install --with-deps chromium
-      - run: npm test
+      - run: pnpm run typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test
 
   kotlin:
     permissions:
