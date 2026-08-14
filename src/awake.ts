@@ -55,6 +55,8 @@ export class ScreenAwake {
   private sentinel: WakeLockSentinel | undefined;
   private wanted = false;
   private started = false;
+  /** A request is out. See [`take`] for what asking twice at once costs. */
+  private taking = false;
   private readonly view: (Window & typeof globalThis) | null;
 
   constructor(
@@ -119,12 +121,37 @@ export class ScreenAwake {
     else await this.drop();
   }
 
+  /**
+   * ⚠ **Whatever is in hand here is stale, and asking it is the bug.** The
+   * browser drops the lock every time the document stops being visible, so on
+   * the way back there is nothing held by definition — but `released` is written
+   * only by JS running in the page, and a process Android froze in the
+   * background had none to run. It thaws with a handle reporting itself live
+   * over a lock the platform took back. Believing it left the button lit over a
+   * screen that went dark, for the rest of the session, with nothing said.
+   *
+   * So the handle is let go rather than consulted. `wanted` is the state that
+   * survives a hide; the sentinel is not, and must not be treated as evidence.
+   */
   private readonly onVisible = (): void => {
-    if (this.doc.visibilityState === 'visible' && this.wanted) void this.take();
+    if (this.doc.visibilityState !== 'visible' || !this.wanted) return;
+    void this.retake();
   };
+
+  private async retake(): Promise<void> {
+    await this.drop();
+    await this.take();
+  }
 
   private async take(): Promise<void> {
     if (this.sentinel && !this.sentinel.released) return;
+    // One request in flight at a time. Asking again on every return is what
+    // makes this necessary: two transitions in quick succession would both find
+    // nothing in hand, both be handed a lock, and only the last handle be kept —
+    // leaving the other held until the process dies, which is a screen that can
+    // never sleep again.
+    if (this.taking) return;
+    this.taking = true;
     try {
       this.sentinel = await this.view?.navigator.wakeLock.request('screen');
     } catch (err: unknown) {
@@ -138,6 +165,8 @@ export class ScreenAwake {
       this.announce(false);
       this.remember(false);
       this.config.onRefused?.(why(err));
+    } finally {
+      this.taking = false;
     }
   }
 

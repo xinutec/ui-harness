@@ -21,6 +21,24 @@ class FakeSentinel {
 
 let handed: FakeSentinel[] = [];
 let request: ReturnType<typeof vi.fn>;
+let made: ScreenAwake[] = [];
+
+/**
+ * One under test, torn down with the test.
+ *
+ * ⚠ **Not `new ScreenAwake` directly.** `start()` subscribes to the shared
+ * `document`, and a test that never stops its instance leaves it listening for
+ * the whole file — so the next test's visibility events are answered by every
+ * instance before it, each asking for a lock of its own. That went unseen while
+ * a stale instance would early-return on the sentinel it still held; the moment
+ * returning to the front meant asking again, one visibility event produced
+ * twelve requests and four tests failed on the leak rather than on themselves.
+ */
+function screenAwake(config?: ConstructorParameters<typeof ScreenAwake>[1]): ScreenAwake {
+  const awake = new ScreenAwake(document, config);
+  made.push(awake);
+  return awake;
+}
 
 /** Give the window a wake lock that works. */
 function withWakeLock(): void {
@@ -54,29 +72,31 @@ function visibility(state: 'visible' | 'hidden'): void {
 
 beforeEach(() => {
   handed = [];
+  made = [];
   localStorage.clear();
   visibility('visible');
   withWakeLock();
 });
 
 afterEach(() => {
+  for (const awake of made) awake.stop();
   withoutWakeLock();
 });
 
 describe('possible', () => {
   it('is false where the browser has no wake lock, so no button is offered', () => {
     withoutWakeLock();
-    expect(new ScreenAwake(document).possible).toBe(false);
+    expect(screenAwake().possible).toBe(false);
   });
 
   it('is true where it has one', () => {
-    expect(new ScreenAwake(document).possible).toBe(true);
+    expect(screenAwake().possible).toBe(true);
   });
 });
 
 describe('holding it', () => {
   it('takes a screen lock when turned on, and lets it go when turned off', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     await awake.set(true);
     expect(request).toHaveBeenCalledWith('screen');
     expect(awake.on).toBe(true);
@@ -87,7 +107,7 @@ describe('holding it', () => {
   });
 
   it('does not take a second lock while it already holds one', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     await awake.set(true);
     await awake.set(true);
     expect(request).toHaveBeenCalledTimes(1);
@@ -95,14 +115,14 @@ describe('holding it', () => {
 
   it('says so once per change, not once per call', async () => {
     const onChange = vi.fn();
-    const awake = new ScreenAwake(document, { onChange });
+    const awake = screenAwake({ onChange });
     await awake.set(true);
     await awake.set(true);
     expect(onChange.mock.calls).toEqual([[true]]);
   });
 
   it('toggles from whatever it is', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     awake.toggle();
     await vi.waitFor(() => expect(awake.on).toBe(true));
     awake.toggle();
@@ -112,7 +132,7 @@ describe('holding it', () => {
 
 describe('taking it back', () => {
   it('asks again when the app returns to the front, because the browser dropped it', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     awake.start();
     await awake.set(true);
 
@@ -125,8 +145,46 @@ describe('taking it back', () => {
     expect(awake.on).toBe(true);
   });
 
+  it('asks again even holding a handle that still claims to be live', async () => {
+    // ⚠ **The case above, with the one thing Android does not do.** There the
+    // browser set `released` on the way out; `released` is only ever written by
+    // JS running in the page, and a process frozen while it was in the
+    // background has none to run. It thaws holding a handle that reports itself
+    // live over a lock the platform took back — and the old guard believed it,
+    // so nothing asked again for the rest of the session. The button stayed lit
+    // over a screen that went dark, which is the whole complaint.
+    const awake = screenAwake();
+    awake.start();
+    await awake.set(true);
+
+    visibility('hidden');
+    visibility('visible');
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    expect(awake.on).toBe(true);
+  });
+
+  it('is holding exactly one lock however fast the app comes and goes', async () => {
+    // Asking again on every return is what makes the leak possible: two
+    // transitions can both find nothing in hand and each be given a lock, and
+    // only the last handle is kept. The other is held until the process dies —
+    // a screen that can never sleep again, which is worse than the fault fixed
+    // above.
+    const awake = screenAwake();
+    awake.start();
+    await awake.set(true);
+
+    visibility('hidden');
+    visibility('visible');
+    visibility('hidden');
+    visibility('visible');
+
+    await vi.waitFor(() => expect(awake.on).toBe(true));
+    expect(handed.filter((sentinel) => !sentinel.released)).toHaveLength(1);
+  });
+
   it('does not ask again for a screen nobody chose to keep on', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     awake.start();
     visibility('hidden');
     visibility('visible');
@@ -139,7 +197,7 @@ describe('a refusal', () => {
   it('turns the button back off and reports why, when somebody was looking', async () => {
     const onRefused = vi.fn();
     request.mockRejectedValue(new DOMException('denied', 'NotAllowedError'));
-    const awake = new ScreenAwake(document, { onRefused });
+    const awake = screenAwake({ onRefused });
 
     await awake.set(true);
 
@@ -153,7 +211,7 @@ describe('a refusal', () => {
     // decision nobody was present for.
     const onRefused = vi.fn();
     request.mockRejectedValueOnce(new DOMException('hidden', 'NotAllowedError'));
-    const awake = new ScreenAwake(document, { onRefused });
+    const awake = screenAwake({ onRefused });
     awake.start();
 
     visibility('hidden');
@@ -170,34 +228,34 @@ describe('a refusal', () => {
 
 describe('remembering', () => {
   it('starts held when it was held last time', async () => {
-    await new ScreenAwake(document).set(true);
+    await screenAwake().set(true);
 
-    const next = new ScreenAwake(document);
+    const next = screenAwake();
     next.start();
     await vi.waitFor(() => expect(next.on).toBe(true));
   });
 
   it('starts loose when it was turned off', async () => {
-    const first = new ScreenAwake(document);
+    const first = screenAwake();
     await first.set(true);
     await first.set(false);
 
-    const next = new ScreenAwake(document);
+    const next = screenAwake();
     next.start();
     await Promise.resolve();
     expect(next.on).toBe(false);
   });
 
   it('starts loose when nothing was ever chosen', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     awake.start();
     await Promise.resolve();
     expect(awake.on).toBe(false);
   });
 
   it('keeps two apps on one origin apart when they ask for it', async () => {
-    await new ScreenAwake(document, { key: 'console.awake' }).set(true);
-    const other = new ScreenAwake(document, { key: 'other.awake' });
+    await screenAwake({ key: 'console.awake' }).set(true);
+    const other = screenAwake({ key: 'other.awake' });
     other.start();
     await Promise.resolve();
     expect(other.on).toBe(false);
@@ -206,7 +264,7 @@ describe('remembering', () => {
 
 describe('start', () => {
   it('wires one listener however often it is called', async () => {
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     awake.start();
     awake.start();
     await awake.set(true);
@@ -217,7 +275,7 @@ describe('start', () => {
 
   it('does nothing at all where there is no wake lock', () => {
     withoutWakeLock();
-    const awake = new ScreenAwake(document);
+    const awake = screenAwake();
     expect(() => awake.start()).not.toThrow();
     awake.toggle();
     expect(awake.on).toBe(false);
