@@ -1,0 +1,9 @@
+# This repo is not a workspace. The file exists because pnpm 11 moved settings
+# out of package.json's `pnpm` field, and an override is the only way to raise a
+# transitive that nothing in the tree asks for — an advisory is not a resolution
+# constraint, so `pnpm update` leaves it exactly where it is.
+#
+# nanoid: vitest's vite pulls postcss's 3.3.16, and GHSA covers everything below
+# 3.3.18. postcss's own range (^3.3.17) already permits the fix.
+overrides:
+  nanoid: ^3.3.18
