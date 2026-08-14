@@ -111,6 +111,33 @@ export function rewriteAllowBuilds(text: string, sha: string): string | null {
 }
 
 /**
+ * Grant `sha` without withdrawing what is already granted, for the install.
+ *
+ * ⚠ **The install resolves the commit on its way OUT before it writes the one
+ * coming in**, so withdrawing the old permission first is not tidiness — it is
+ * the bug. pnpm meets a build script nobody approved and exits 1 with
+ * ERR_PNPM_IGNORED_BUILDS naming the OLD commit, which reads like the rewrite
+ * never happened at all. It also appends a `set this to true or false` line for
+ * that commit on the way down, so the failed run has edited the file it failed
+ * on, and a second attempt dies on a duplicate mapping key instead.
+ *
+ * Both stand for the length of the install. [`rewriteAllowBuilds`] collapses
+ * them afterwards, once the lockfile names only the survivor.
+ */
+export function allowBoth(text: string, sha: string): string | null {
+  const out: string[] = [];
+  let seen = false;
+  for (const line of text.split('\n')) {
+    out.push(line);
+    const m = ALLOW_LINE.exec(line);
+    if (m === null || seen) continue;
+    seen = true;
+    if (!line.includes(sha)) out.push(`${m[1]}${m[2]}${PKG}@${TARBALL}${sha}${m[2]}: true`);
+  }
+  return seen ? out.join('\n') : null;
+}
+
+/**
  * Rewrite the spec, move the build permission with it, and bring the lockfile.
  *
  * All three, always. A manifest and lockfile that disagree are not untidy: pnpm
@@ -135,11 +162,66 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
   // workspace file or key is a broken consumer, not an npm one to skip quietly.
   const workspace = join(entry.dir, 'pnpm-workspace.yaml');
   if (!existsSync(workspace)) fail(`${workspace}: missing — pnpm consumers need one`);
+  const during = allowBoth(readFileSync(workspace, 'utf8'), sha);
+  if (during === null) fail(`${workspace}: found no ${PKG} allowBuilds key to move`);
+  writeFileSync(workspace, during);
+
+  // `inherit`, not `ignore`. This threw for one repo in thirteen and the error
+  // carried `stdout: null, stderr: null` under ten lines of node internals, so
+  // pnpm's actual complaint — the one naming which commit it would not build —
+  // never reached the screen and the fault above took a manual re-run to see.
+  execFileSync('pnpm', ['install', '--lockfile-only'], { cwd: entry.dir, stdio: 'inherit' });
+
+  // Now, and not before: the lockfile names only `sha`, so every other key is
+  // dead — the one just left behind, and any placeholder an earlier failed run
+  // wrote.
   const moved = rewriteAllowBuilds(readFileSync(workspace, 'utf8'), sha);
   if (moved === null) fail(`${workspace}: found no ${PKG} allowBuilds key to move`);
   writeFileSync(workspace, moved);
+}
 
-  execFileSync('pnpm', ['install', '--lockfile-only'], { cwd: entry.dir, stdio: 'ignore' });
+/** The three files a bump writes, and the only three a cleanup may revert. */
+const PIN_FILES = ['frontend/package.json', 'frontend/pnpm-lock.yaml', 'frontend/pnpm-workspace.yaml'];
+
+/**
+ * Work in a consumer's tree that a cleanup would destroy.
+ *
+ * ⚠ **Not "is the tree dirty".** A bump leaves its own three files changed, so
+ * flat dirtiness refuses every re-run — including the second half of a run that
+ * failed in the middle, which is exactly when this is wanted. What matters is
+ * whether reverting those three would take anything else with it.
+ *
+ * Porcelain paths are matched whole, so a rename line (`R old -> new`) reads as
+ * foreign and refuses. That is the safe way round: a bump never renames.
+ *
+ * ⚠ **The status field is read as a token, not as two columns.** Porcelain pads
+ * it to two characters, so a fixed `slice(3)` is right — until the caller trims
+ * the output, which eats the leading space of the FIRST line only and shifts it
+ * by one. That shipped: every path came back as `rontend/package.json` and the
+ * guard refused all twelve repos, naming a file that does not exist.
+ */
+export function foreignChanges(porcelain: string): string[] {
+  return porcelain
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .map((line) => line.replace(/^\S+\s+/, ''))
+    .filter((path) => !PIN_FILES.includes(path));
+}
+
+/**
+ * Collapse a correctly-pinned repo's leftover permissions to the one that counts.
+ *
+ * Returns what to say about it, so a repo needing nothing stays a quiet line.
+ */
+function tidy(entry: { repo: string; dir: string }, sha: string, apply: boolean): string {
+  const workspace = join(entry.dir, 'pnpm-workspace.yaml');
+  if (!existsSync(workspace)) return '';
+  const text = readFileSync(workspace, 'utf8');
+  const moved = rewriteAllowBuilds(text, sha);
+  if (moved === null || moved === text) return '';
+  if (apply) writeFileSync(workspace, moved);
+  return apply ? ' (dropped stale build permissions)' : ' (has stale build permissions)';
 }
 
 function main(): void {
@@ -156,11 +238,47 @@ function main(): void {
     fail(`refusing: ${sha} is not on origin/main — push the harness first`);
   }
 
+  // ⚠ **Nothing is edited until every repo is clean.** This is not a
+  // transaction and cannot be made one — it edits thirteen working trees and
+  // pnpm can fail in the middle of any of them, which it did, leaving two repos
+  // changed with nothing said. Refusing up front is what makes the cleanup after
+  // a failure safe: `git checkout` on the three pin files is only the right
+  // answer if there was nothing else in the tree to lose.
+  //
+  // It is not hypothetical. While the failed run above was being diagnosed,
+  // another session committed unrelated work in one of these repos; a blanket
+  // revert across the list would have destroyed it.
+  if (apply) {
+    const risky = consumers()
+      .map((entry) => ({
+        repo: entry.repo,
+        foreign: foreignChanges(git(['status', '--porcelain'], entry.dir)),
+      }))
+      .filter((entry) => entry.foreign.length > 0);
+    if (risky.length > 0) {
+      fail(
+        `refusing: uncommitted work outside the pin files in ${risky
+          .map((entry) => `${entry.repo} (${entry.foreign.join(', ')})`)
+          .join('; ')}\n` +
+          'A bump that fails partway is cleaned up by reverting the pin files, ' +
+          'which would take that work with it. Commit or stash it first.',
+      );
+    }
+  }
+
   let changed = 0;
   for (const entry of consumers()) {
     const current = pinnedCommit(entry.manifest);
     if (current === sha) {
-      console.log(`${entry.repo.padEnd(12)} already at ${sha.slice(0, 12)}`);
+      // ⚠ **Already pinned is where residue survives**, and skipping outright is
+      // how it accumulated: a repo at the right commit still carries the
+      // placeholders pnpm wrote beside older ones, each an unapproved build
+      // script waiting to fail an install. memview was pinned correctly and
+      // still had one from a commit two bumps back. Collapsing is a text rewrite
+      // — no resolution, no lockfile, nothing to install — so it costs nothing
+      // to do here.
+      const tidied = tidy(entry, sha, apply);
+      console.log(`${entry.repo.padEnd(12)} already at ${sha.slice(0, 12)}${tidied}`);
       continue;
     }
     changed += 1;

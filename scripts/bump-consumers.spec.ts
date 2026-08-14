@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { rewriteAllowBuilds } from './bump-consumers.ts';
+import { allowBoth, foreignChanges, rewriteAllowBuilds } from './bump-consumers.ts';
 
 /**
  * The half of a bump that used to be left behind.
@@ -69,5 +69,87 @@ describe('rewriteAllowBuilds', () => {
     expect(out).toContain('  msgpackr-extract: true');
     expect(out).toContain('# a comment about builds');
     expect(out).not.toContain(OLD);
+  });
+});
+
+/**
+ * The permission the install itself needs, which is not the one it ends with.
+ *
+ * ⚠ **The install resolves the commit on its way OUT before it writes the one
+ * coming in.** Moving the grant first and then installing is what broke the
+ * 13-repo bump on 2026-08-14: pnpm met a build script nobody had approved and
+ * exited 1 with ERR_PNPM_IGNORED_BUILDS — naming the OLD commit, which reads
+ * like the rewrite never happened. It also appended a `set this to true or
+ * false` line for that commit on the way down, so the run edited the file it
+ * failed on and the next attempt died on a duplicate mapping key instead.
+ *
+ * So both stand while pnpm works, and `rewriteAllowBuilds` collapses them once
+ * the lockfile names only the survivor.
+ */
+describe('allowBoth', () => {
+  it('grants the new commit without withdrawing the old', () => {
+    const out = allowBoth(file(`  "@xinutec/ui-harness@${URL_}${OLD}": true`), NEW);
+    expect(out).toBe(
+      file(`  "@xinutec/ui-harness@${URL_}${OLD}": true\n  "@xinutec/ui-harness@${URL_}${NEW}": true`),
+    );
+  });
+
+  it('adds nothing when the file already grants that commit', () => {
+    // Re-running a bump that got partway must not write a duplicate mapping key,
+    // which pnpm refuses to parse at all — a worse failure than the one being
+    // fixed, and the one a second attempt actually hit.
+    const text = file(`  "@xinutec/ui-harness@${URL_}${NEW}": true`);
+    expect(allowBoth(text, NEW)).toBe(text);
+  });
+
+  it('keeps the quote style, like the rewrite it precedes', () => {
+    const out = allowBoth(file(`  '@xinutec/ui-harness@${URL_}${OLD}': true`), NEW);
+    expect(out).toContain(`  '@xinutec/ui-harness@${URL_}${NEW}': true`);
+  });
+
+  it('reports a file with no key rather than inventing one', () => {
+    expect(allowBoth(file('  lmdb: true'), NEW)).toBeNull();
+  });
+});
+
+/**
+ * What a cleanup after a failed run is allowed to touch.
+ *
+ * The guard this feeds refuses to start when a consumer holds work that
+ * reverting the pin files would destroy — which is not the same as refusing a
+ * dirty tree. A bump leaves its own three files changed, so a flat dirtiness
+ * check refuses every re-run, including the second half of a run that failed in
+ * the middle.
+ */
+describe('foreignChanges', () => {
+  it('sees nothing to lose in a tree holding only a bump', () => {
+    const porcelain = ' M frontend/package.json\n M frontend/pnpm-lock.yaml\n M frontend/pnpm-workspace.yaml';
+    expect(foreignChanges(porcelain)).toEqual([]);
+  });
+
+  it('names work a revert would destroy', () => {
+    // Not hypothetical: another session committed Heartbeat work in `recall`
+    // while a failed bump was being diagnosed next door.
+    const porcelain = ' M frontend/package.json\n M android/app/src/main/kotlin/Heartbeat.kt';
+    expect(foreignChanges(porcelain)).toEqual(['android/app/src/main/kotlin/Heartbeat.kt']);
+  });
+
+  it('reads staged and untracked alike, since a revert is no kinder to either', () => {
+    expect(foreignChanges('M  src/a.ts\n?? notes.md')).toEqual(['src/a.ts', 'notes.md']);
+  });
+
+  it('is quiet on a clean tree', () => {
+    expect(foreignChanges('')).toEqual([]);
+  });
+
+  it('reads the output as the caller actually hands it over, trimmed', () => {
+    // ⚠ The regression this exists for. `git()` trims what it returns, which
+    // eats the leading space of the FIRST porcelain line and no other, so a
+    // fixed-width read shifts that one path by a character. Every repo then
+    // looks like it holds foreign work called `rontend/package.json`, and the
+    // guard refuses the whole fleet. The fixture above is the untrimmed shape
+    // and passed throughout.
+    const porcelain = ' M frontend/package.json\n M frontend/pnpm-lock.yaml'.trim();
+    expect(foreignChanges(porcelain)).toEqual([]);
   });
 });
