@@ -50,6 +50,25 @@ export interface AwakeConfig {
 
 const DEFAULT_KEY = 'ui.awake';
 
+/**
+ * How often a held lock is looked at again.
+ *
+ * Cheap by construction: this only runs while the screen is being kept on, which
+ * is a screen that is already lit. Short enough that a lock lost under a 30s
+ * display timeout is back before the second timeout would fire.
+ */
+const BEAT_MS = 15_000;
+
+/**
+ * How late a beat has to be before it counts as evidence rather than jitter.
+ *
+ * A whole missed interval. Phones coalesce timers routinely and a beat a second
+ * or two late means nothing; one that misses its turn entirely means the process
+ * was not running, and a process that was not running is a process that could
+ * have had the lock taken from it without a word.
+ */
+const SUSPENDED_MS = BEAT_MS;
+
 export class ScreenAwake {
   /** The lock in hand, while there is one. */
   private sentinel: WakeLockSentinel | undefined;
@@ -57,6 +76,9 @@ export class ScreenAwake {
   private started = false;
   /** A request is out. See [`take`] for what asking twice at once costs. */
   private taking = false;
+  private beat: ReturnType<typeof setInterval> | undefined;
+  /** When the last beat ran, so the next one can say how late it is. */
+  private beatAt = 0;
   private readonly view: (Window & typeof globalThis) | null;
 
   constructor(
@@ -99,14 +121,41 @@ export class ScreenAwake {
     if (this.started || !this.possible) return;
     this.started = true;
     this.doc.addEventListener('visibilitychange', this.onVisible);
+    this.beatAt = Date.now();
+    this.beat = setInterval(this.onBeat, BEAT_MS);
     if (this.remembered() === 'yes') void this.set(true);
   }
 
   stop(): void {
     this.doc.removeEventListener('visibilitychange', this.onVisible);
+    if (this.beat !== undefined) clearInterval(this.beat);
+    this.beat = undefined;
     this.started = false;
     void this.drop();
   }
+
+  /**
+   * ⚠ **A returning app is not the only way a lock goes missing, and waiting for
+   * one is how this stayed broken.** Measured on the phone (2026-08-15) on a
+   * build that already refused to trust a stale handle: the app was in the
+   * FOREGROUND, visible, the button lit, and no `KEEP_SCREEN_ON` on the device.
+   * A probe took a lock instantly with no gesture, so nothing had refused it —
+   * nothing had asked. Nothing had hidden the page since it went, so the one
+   * trigger there was never fired.
+   *
+   * From inside a frozen process the only observable is the clock: timers do not
+   * run, so a beat that misses its turn entirely IS the freeze, seen afterwards.
+   * The sentinel cannot report it — that is the flag Android leaves lying.
+   */
+  private readonly onBeat = (): void => {
+    const now = Date.now();
+    const late = now - this.beatAt - BEAT_MS;
+    this.beatAt = now;
+    if (!this.wanted || this.doc.visibilityState !== 'visible') return;
+    // An honest release and a missing handle are cheap to spot and worth acting
+    // on here too; the lateness is what catches the case nothing reports.
+    if (late > SUSPENDED_MS || !this.sentinel || this.sentinel.released) void this.retake();
+  };
 
   /** The button. */
   toggle(): void {

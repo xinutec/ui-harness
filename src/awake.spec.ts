@@ -281,3 +281,88 @@ describe('start', () => {
     expect(awake.on).toBe(false);
   });
 });
+
+/**
+ * The trigger that does not depend on anything happening.
+ *
+ * ⚠ **`visibilitychange` was the only way back, and that is not enough.**
+ * Measured on the Pixel 9 on 2026-08-15, on a build that already had the
+ * stale-handle fix: the console sat in the FOREGROUND, visible, with the button
+ * lit and `KEEP_SCREEN_ON` absent from every window on the device. A probe took
+ * a lock instantly, with no gesture — so it was never refused, it was never
+ * asked for. Nothing had hidden the page since the lock went, so nothing fired.
+ *
+ * A frozen process cannot be told about from inside except by the clock: its
+ * timers do not run, so a beat that should have come 15 seconds ago and comes
+ * five minutes late IS the freeze, observed. That is the one signal available,
+ * and the sentinel's own `released` flag is not — Android leaves it lying.
+ */
+describe('the heartbeat', () => {
+  it('takes it back after a gap no timer should leave, holding a handle that claims to be live', async () => {
+    vi.useFakeTimers();
+    try {
+      const awake = screenAwake();
+      awake.start();
+      await awake.set(true);
+      expect(request).toHaveBeenCalledTimes(1);
+
+      // ⚠ **Frozen is the clock moving while the timers do NOT run.** Advancing
+      // fake timers runs every beat on schedule, which is the opposite of the
+      // thing under test — written that way first, it reported a lateness of
+      // zero twenty times over and the test passed against no fix at all. So the
+      // wall clock is moved on its own, and only then is one beat let through.
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(request.mock.calls.length).toBeGreaterThan(1);
+      expect(awake.on).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks nothing while the beats arrive on time', async () => {
+    // The lock is held and the flag is honest: re-requesting on every beat would
+    // churn a new sentinel every 15 seconds for no reason.
+    vi.useFakeTimers();
+    try {
+      const awake = screenAwake();
+      awake.start();
+      await awake.set(true);
+
+      for (let i = 0; i < 4; i += 1) await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says nothing about a screen nobody chose to keep on', async () => {
+    vi.useFakeTimers();
+    try {
+      screenAwake().start();
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops beating when it is stopped', async () => {
+    vi.useFakeTimers();
+    try {
+      const awake = screenAwake();
+      awake.start();
+      await awake.set(true);
+      awake.stop();
+      request.mockClear();
+
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
