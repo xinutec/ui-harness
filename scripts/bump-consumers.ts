@@ -238,18 +238,24 @@ function main(): void {
     fail(`refusing: ${sha} is not on origin/main — push the harness first`);
   }
 
-  // ⚠ **Nothing is edited until every repo is clean.** This is not a
-  // transaction and cannot be made one — it edits thirteen working trees and
+  // ⚠ **Nothing is edited until every repo this run will TOUCH is clean.** It is
+  // not a transaction and cannot be made one — it edits many working trees and
   // pnpm can fail in the middle of any of them, which it did, leaving two repos
   // changed with nothing said. Refusing up front is what makes the cleanup after
   // a failure safe: `git checkout` on the three pin files is only the right
-  // answer if there was nothing else in the tree to lose.
+  // answer if there was nothing else in that tree to lose.
   //
-  // It is not hypothetical. While the failed run above was being diagnosed,
-  // another session committed unrelated work in one of these repos; a blanket
-  // revert across the list would have destroyed it.
+  // It is not hypothetical, in either direction. Another session committed
+  // unrelated work in one of these repos while a failed run was being diagnosed,
+  // which a blanket revert would have destroyed — and a first version of this
+  // guard read EVERY consumer, so unrelated work in a repo already at `sha`
+  // refused a bump that would never have gone near it. Scope the question to the
+  // repos actually being written to.
+  const willTouch = consumers().filter(
+    (entry) => pinnedCommit(entry.manifest) !== sha || tidy(entry, sha, false) !== '',
+  );
   if (apply) {
-    const risky = consumers()
+    const risky = willTouch
       .map((entry) => ({
         repo: entry.repo,
         foreign: foreignChanges(git(['status', '--porcelain'], entry.dir)),
