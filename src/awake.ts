@@ -51,23 +51,13 @@ export interface AwakeConfig {
 const DEFAULT_KEY = 'ui.awake';
 
 /**
- * How often a held lock is looked at again.
+ * How often the lock is taken again.
  *
  * Cheap by construction: this only runs while the screen is being kept on, which
  * is a screen that is already lit. Short enough that a lock lost under a 30s
  * display timeout is back before the second timeout would fire.
  */
 const BEAT_MS = 15_000;
-
-/**
- * How late a beat has to be before it counts as evidence rather than jitter.
- *
- * A whole missed interval. Phones coalesce timers routinely and a beat a second
- * or two late means nothing; one that misses its turn entirely means the process
- * was not running, and a process that was not running is a process that could
- * have had the lock taken from it without a word.
- */
-const SUSPENDED_MS = BEAT_MS;
 
 export class ScreenAwake {
   /** The lock in hand, while there is one. */
@@ -77,8 +67,6 @@ export class ScreenAwake {
   /** A request is out. See [`take`] for what asking twice at once costs. */
   private taking = false;
   private beat: ReturnType<typeof setInterval> | undefined;
-  /** When the last beat ran, so the next one can say how late it is. */
-  private beatAt = 0;
   private readonly view: (Window & typeof globalThis) | null;
 
   constructor(
@@ -121,7 +109,6 @@ export class ScreenAwake {
     if (this.started || !this.possible) return;
     this.started = true;
     this.doc.addEventListener('visibilitychange', this.onVisible);
-    this.beatAt = Date.now();
     this.beat = setInterval(this.onBeat, BEAT_MS);
     if (this.remembered() === 'yes') void this.set(true);
   }
@@ -135,26 +122,29 @@ export class ScreenAwake {
   }
 
   /**
-   * ⚠ **A returning app is not the only way a lock goes missing, and waiting for
-   * one is how this stayed broken.** Measured on the phone (2026-08-15) on a
-   * build that already refused to trust a stale handle: the app was in the
-   * FOREGROUND, visible, the button lit, and no `KEEP_SCREEN_ON` on the device.
-   * A probe took a lock instantly with no gesture, so nothing had refused it —
-   * nothing had asked. Nothing had hidden the page since it went, so the one
-   * trigger there was never fired.
+   * ⚠ **Take it again. Do not work out whether it is needed — that question has
+   * no honest answer from in here, and asking it is what kept this broken.**
    *
-   * From inside a frozen process the only observable is the clock: timers do not
-   * run, so a beat that misses its turn entirely IS the freeze, seen afterwards.
-   * The sentinel cannot report it — that is the flag Android leaves lying.
+   * Three versions tried to be clever and each was beaten by the same thing.
+   * Re-take on return to the front: measured on the phone with the app in the
+   * FOREGROUND the whole time, button lit, and no `KEEP_SCREEN_ON` on the device
+   * — nothing had hidden the page, so the trigger never fired. Re-take when the
+   * handle says it let go: `released` is written only by JS running in the page,
+   * so a lock the platform took back while the process was frozen comes back
+   * reading live. Re-take when a beat is late: catches a freeze and nothing else,
+   * and the fault seen on 2026-08-15 13:10:05 had beats arriving on time — a
+   * running page, an honest-looking handle, and no lock. All three conditions
+   * were false; all three were wrong.
+   *
+   * Every signal available in the page is either the handle or the clock, and
+   * both have now been caught lying. So there is nothing left to test, and
+   * nothing worth testing: a wake lock is a thing held, not a fact to be
+   * inferred, and asking for one costs a promise every fifteen seconds on a
+   * screen that is already lit because we asked.
    */
   private readonly onBeat = (): void => {
-    const now = Date.now();
-    const late = now - this.beatAt - BEAT_MS;
-    this.beatAt = now;
     if (!this.wanted || this.doc.visibilityState !== 'visible') return;
-    // An honest release and a missing handle are cheap to spot and worth acting
-    // on here too; the lateness is what catches the case nothing reports.
-    if (late > SUSPENDED_MS || !this.sentinel || this.sentinel.released) void this.retake();
+    void this.retake();
   };
 
   /** The button. */
@@ -187,9 +177,36 @@ export class ScreenAwake {
     void this.retake();
   };
 
+  /**
+   * Get a fresh lock, then let the old one go — in that order.
+   *
+   * ⚠ **Releasing first leaves a window holding nothing**, which was tolerable
+   * while this ran only on a return to the front (the browser had already taken
+   * the lock back, so there was nothing to drop) and is not now that it runs
+   * every fifteen seconds. Two costs, and the second is the one that would have
+   * been hard to find: the screen is briefly unclaimed, and `awake-watch.sh`
+   * samples the phone once a minute for exactly the state "button lit, no lock"
+   * — so a gap of our own making would eventually be sampled and logged as a
+   * FAULT. The instrument would have been reporting the fix.
+   *
+   * Holding two locks for the width of one `release()` is harmless: the window
+   * flag and `dumpsys power` both read "a lock is held", which is the truth.
+   *
+   * A refused request puts the old handle back rather than leaving nothing —
+   * it may be dead, but a dead handle is no worse than none and dropping the
+   * reference would leak a lock the process can never release.
+   */
   private async retake(): Promise<void> {
-    await this.drop();
+    const held = this.sentinel;
+    // Cleared so `take` does not see a live-looking handle and return early —
+    // that guard is what makes "already holding one" cheap everywhere else.
+    this.sentinel = undefined;
     await this.take();
+    if (this.sentinel === undefined) {
+      this.sentinel = held;
+      return;
+    }
+    if (held && !held.released) await held.release().catch(() => undefined);
   }
 
   private async take(): Promise<void> {

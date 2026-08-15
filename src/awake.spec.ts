@@ -180,7 +180,16 @@ describe('taking it back', () => {
     visibility('visible');
 
     await vi.waitFor(() => expect(awake.on).toBe(true));
-    expect(handed.filter((sentinel) => !sentinel.released)).toHaveLength(1);
+    // ⚠ **The invariant is EVENTUAL now, and deliberately.** `retake` acquires
+    // before releasing, so between the new lock arriving and the old one going
+    // there is a moment holding two — which is the point: releasing first left a
+    // moment holding NONE, and `awake-watch.sh` samples the phone for exactly
+    // that state once a minute. Asserting immediately reads that moment and
+    // reports a leak; this waits for the settled count, which is what "holding
+    // exactly one" ever meant.
+    await vi.waitFor(() => {
+      expect(handed.filter((sentinel) => !sentinel.released)).toHaveLength(1);
+    });
   });
 
   it('does not ask again for a screen nobody chose to keep on', async () => {
@@ -292,10 +301,14 @@ describe('start', () => {
  * a lock instantly, with no gesture — so it was never refused, it was never
  * asked for. Nothing had hidden the page since the lock went, so nothing fired.
  *
- * A frozen process cannot be told about from inside except by the clock: its
- * timers do not run, so a beat that should have come 15 seconds ago and comes
- * five minutes late IS the freeze, observed. That is the one signal available,
- * and the sentinel's own `released` flag is not — Android leaves it lying.
+ * ⚠ **A beat's LATENESS was the next answer, and it is also not enough.** The
+ * reasoning was sound as far as it went: a frozen process cannot be told about
+ * from inside except by the clock, since its timers do not run. But it catches a
+ * freeze and only a freeze, and the 13:10:05 fault had beats arriving on time.
+ *
+ * Every signal in the page is the handle or the clock; both have been caught
+ * lying. So the beat stopped asking whether the lock is there and simply takes
+ * it again — which is why the tests below count REQUESTS rather than conditions.
  */
 describe('the heartbeat', () => {
   it('takes it back after a gap no timer should leave, holding a handle that claims to be live', async () => {
@@ -311,6 +324,11 @@ describe('the heartbeat', () => {
       // thing under test — written that way first, it reported a lateness of
       // zero twenty times over and the test passed against no fix at all. So the
       // wall clock is moved on its own, and only then is one beat let through.
+      //
+      // This survives the beat no longer reading the clock at all: a thaw must
+      // still come back with a lock, and that is what it asserts. It would pass
+      // vacuously now, so it is kept for the case it names rather than as the
+      // proof of anything — the test below is the one that would fail.
       vi.setSystemTime(Date.now() + 5 * 60_000);
       await vi.advanceTimersByTimeAsync(15_000);
 
@@ -321,18 +339,75 @@ describe('the heartbeat', () => {
     }
   });
 
-  it('asks nothing while the beats arrive on time', async () => {
-    // The lock is held and the flag is honest: re-requesting on every beat would
-    // churn a new sentinel every 15 seconds for no reason.
+  it('is never holding nothing while it swaps one lock for the next', async () => {
+    // ⚠ **The reason `retake` acquires before releasing, and it is about the
+    // INSTRUMENT as much as the screen.** `awake-watch.sh` samples the phone once
+    // a minute for "button lit, no lock" and calls it a fault. Releasing first
+    // opens a window of exactly that state four times a minute, so the watcher
+    // would eventually sample one and log a FAULT caused by the fix — evidence
+    // for #892 manufactured by #892's own repair.
+    //
+    // ⚠ **The window has to be held OPEN to be seen, and the first version of
+    // this test did not.** Letting the swap run to completion and then counting
+    // passes whichever order it happens in — the gap is real and closes within a
+    // microtask. Ablated against `drop(); take();` it reported nothing wrong. So
+    // the next request is made to hang, and the invariant is read while it does.
+    const awake = screenAwake();
+    awake.start();
+    await awake.set(true);
+
+    let hand: () => void = () => undefined;
+    request.mockImplementationOnce(
+      async () =>
+        new Promise<FakeSentinel>((resolve) => {
+          hand = () => {
+            const sentinel = new FakeSentinel();
+            handed.push(sentinel);
+            resolve(sentinel);
+          };
+        }),
+    );
+
+    visibility('hidden');
+    visibility('visible');
+    await Promise.resolve();
+
+    // Mid-swap: a request is outstanding and nothing new has arrived. The lock
+    // from before must still be held, or the screen — and the watcher — sees a
+    // phone claiming to be kept awake by nobody.
+    expect(handed.some((sentinel) => !sentinel.released)).toBe(true);
+
+    hand();
+    await vi.waitFor(() => {
+      expect(handed.filter((sentinel) => !sentinel.released)).toHaveLength(1);
+    });
+  });
+
+  it('asks again on every beat, even with the beats on time and a handle in hand', async () => {
+    // ⚠ **This test asserted the OPPOSITE until 2026-08-15, and its reason —
+    // "the lock is held and the flag is honest" — was the assumption the phone
+    // disproved.** At 13:10:05 the watcher caught the app in front, the button
+    // lit, beats arriving on time, `released` false, and NO lock on the device
+    // by either instrument. Every condition the beat used to gate on was false;
+    // the lock was gone anyway.
+    //
+    // So there is nothing left to test from in here, and re-requesting is not
+    // churn but the entire fix: four promises a minute on a screen that is lit
+    // because we asked for it to be.
     vi.useFakeTimers();
     try {
       const awake = screenAwake();
       awake.start();
       await awake.set(true);
+      expect(request).toHaveBeenCalledTimes(1);
 
       for (let i = 0; i < 4; i += 1) await vi.advanceTimersByTimeAsync(15_000);
 
-      expect(request).toHaveBeenCalledTimes(1);
+      expect(request).toHaveBeenCalledTimes(5);
+      // And it did not accumulate them: one beat's lock replaces the last.
+      await vi.waitFor(() => {
+        expect(handed.filter((sentinel) => !sentinel.released)).toHaveLength(1);
+      });
     } finally {
       vi.useRealTimers();
     }
