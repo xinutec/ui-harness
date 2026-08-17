@@ -1,30 +1,25 @@
 /**
- * Keeping the phone's screen on while somebody is watching — the policy half,
- * with no framework in it.
+ * Keeping the phone's screen on while somebody is watching — the policy half, with no
+ * framework in it.
  *
- * **Why the fleet needs this and a desk browser does not.** Every app here is
- * also an Android WebView wrapper (`android/main`, the shared shell), and a
- * phone's display timeout has no way to tell looking from idling. Anything
- * watched rather than operated goes dark every thirty seconds: a session writing
- * its answer in the console, a route being followed, a chart filling in. Waking
- * it by hand is not merely a nuisance — on a view that follows its own end, a
- * touch is also the gesture that stops it following.
+ * **Why the fleet needs this and a desk browser does not.** Every app here is also an
+ * Android WebView wrapper, and a phone's display timeout cannot tell looking from
+ * idling, so anything watched rather than operated goes dark every thirty seconds. On a
+ * view that follows its own end, waking it by hand is worse than a nuisance: the touch
+ * is also the gesture that stops it following.
  *
- * ⚠ **A wake lock is a thing held, not a setting.** The browser takes it away
- * the moment the document stops being visible and hands nothing back when it
- * returns, so the intent has to outlive the lock and be re-asked for. That is
- * the split here: [`on`] is what was chosen and survives everything, the
- * sentinel is what is actually in hand and does not.
+ * ⚠ **A wake lock is a thing held, not a setting.** The browser takes it away the moment
+ * the document stops being visible and hands nothing back on return, so the intent must
+ * outlive the lock and be re-asked for. Hence the split: [`on`] is what was chosen and
+ * survives everything, the sentinel is what is in hand and does not.
  *
- * That the browser drops it on hiding is also what makes remembering the choice
- * safe. An app left in front holds the screen open; one that goes in a pocket or
- * behind another app has already let go, so a preference set days ago costs
- * nothing at any moment nobody is looking at it.
+ * That the browser drops it on hiding is also what makes remembering the choice safe —
+ * an app in a pocket has already let go, so a preference set days ago costs nothing at
+ * any moment nobody is looking.
  *
- * **A plain class, for the reason `TelemetryCore` is one**: this package is
- * built by plain `tsc`, and an `@Injectable` leaving it carries metadata an AOT
- * build cannot instantiate. Apps keep a thin adapter that turns [`AwakeConfig.onChange`]
- * into whatever their framework draws from.
+ * **A plain class, for the reason `TelemetryCore` is one**: this package is built by
+ * plain `tsc`, and an `@Injectable` leaving it carries metadata an AOT build cannot
+ * instantiate. Apps keep a thin adapter onto [`AwakeConfig.onChange`].
  */
 
 export interface AwakeConfig {
@@ -32,18 +27,16 @@ export interface AwakeConfig {
    *  every app; an override exists for one that wants two of these. */
   key?: string;
   /**
-   * The answer to "is the screen being kept on" changed.
-   *
-   * The one seam a framework binding needs: an app turns this into a signal, an
-   * observable, or a re-render, and this class stays ignorant of which.
+   * The answer to "is the screen being kept on" changed. The one seam a framework
+   * binding needs — a signal, an observable or a re-render, and this class stays
+   * ignorant of which.
    */
   onChange?: (on: boolean) => void;
   /**
    * The browser refused, in front of somebody.
    *
-   * Separate from `onChange` because the two say different things: the state
-   * went back to off either way, but only this says it was not the person's
-   * doing. Apps put it in their activity trace.
+   * Separate from `onChange` because they say different things: the state went back to
+   * off either way, but only this says it was not the person's doing.
    */
   onRefused?: (why: string) => void;
 }
@@ -51,11 +44,9 @@ export interface AwakeConfig {
 const DEFAULT_KEY = 'ui.awake';
 
 /**
- * How often the lock is taken again.
- *
- * Cheap by construction: this only runs while the screen is being kept on, which
- * is a screen that is already lit. Short enough that a lock lost under a 30s
- * display timeout is back before the second timeout would fire.
+ * How often the lock is taken again. Cheap by construction — it only runs while the
+ * screen is being kept on, which is a screen already lit — and short enough that a lock
+ * lost under a 30s display timeout is back before the second timeout would fire.
  */
 const BEAT_MS = 15_000;
 
@@ -77,12 +68,9 @@ export class ScreenAwake {
   }
 
   /**
-   * Whether this browser can do it at all.
-   *
-   * Offered rather than assumed, because a control that cannot work should not
-   * be on a 412px toolbar taking room from something that can. Every app in the
-   * fleet is reached from two places — the phone's WebView and a desk browser —
-   * and only the answer, not the reason, matters to a screen.
+   * Whether this browser can do it at all. Asked rather than assumed, because a control
+   * that cannot work should not take room on a 412px toolbar from one that can — every
+   * app here is reached from both a phone WebView and a desk browser.
    */
   get possible(): boolean {
     return !!this.view && 'wakeLock' in this.view.navigator;
@@ -94,16 +82,14 @@ export class ScreenAwake {
   }
 
   /**
-   * Restore what was chosen last time, and take the lock back on every return
-   * to the front.
+   * Restore what was chosen last time, and take the lock back on every return to the
+   * front. Idempotent, like `TelemetryCore.start`, so an adapter's `init()` tracks
+   * nothing itself.
    *
-   * Idempotent, like `TelemetryCore.start`, so an adapter's `init()` need not
-   * track anything itself.
-   *
-   * `visibilitychange` rather than `focus`: a WebView loses document visibility
-   * when its activity stops, which is exactly the event that precedes both the
-   * lock being dropped and Android freezing the process — and it does not also
-   * fire for a keyboard or a dialog taking focus.
+   * `visibilitychange` rather than `focus`: a WebView loses document visibility when its
+   * activity stops, which is exactly what precedes both the lock being dropped and
+   * Android freezing the process — and it does not fire for a keyboard or a dialog
+   * taking focus.
    */
   start(): void {
     if (this.started || !this.possible) return;
@@ -122,25 +108,20 @@ export class ScreenAwake {
   }
 
   /**
-   * ⚠ **Take it again. Do not work out whether it is needed — that question has
-   * no honest answer from in here, and asking it is what kept this broken.**
+   * ⚠ **Take it again. Do NOT work out whether it is needed — that question has no
+   * honest answer from in here, and asking it is what kept this broken.**
    *
-   * Three versions tried to be clever and each was beaten by the same thing.
-   * Re-take on return to the front: measured on the phone with the app in the
-   * FOREGROUND the whole time, button lit, and no `KEEP_SCREEN_ON` on the device
-   * — nothing had hidden the page, so the trigger never fired. Re-take when the
-   * handle says it let go: `released` is written only by JS running in the page,
-   * so a lock the platform took back while the process was frozen comes back
-   * reading live. Re-take when a beat is late: catches a freeze and nothing else,
-   * and the fault seen on 2026-08-15 13:10:05 had beats arriving on time — a
-   * running page, an honest-looking handle, and no lock. All three conditions
-   * were false; all three were wrong.
+   * Three conditions were tried and all three were wrong. *On return to the front*:
+   * measured with the app in the FOREGROUND throughout, button lit, no
+   * `KEEP_SCREEN_ON` on the device — nothing had hidden the page, so it never fired.
+   * *When the handle says it let go*: `released` is written only by JS running in the
+   * page, so a lock the platform took back while the process was frozen comes back
+   * reading live. *When a beat is late*: catches a freeze and nothing else, and the
+   * 2026-08-15 fault had beats arriving on time.
    *
-   * Every signal available in the page is either the handle or the clock, and
-   * both have now been caught lying. So there is nothing left to test, and
-   * nothing worth testing: a wake lock is a thing held, not a fact to be
-   * inferred, and asking for one costs a promise every fifteen seconds on a
-   * screen that is already lit because we asked.
+   * Every signal in the page is either the handle or the clock, and both have been
+   * caught lying — so there is nothing left worth testing. Asking costs one promise
+   * every fifteen seconds, on a screen already lit because we asked.
    */
   private readonly onBeat = (): void => {
     if (!this.wanted || this.doc.visibilityState !== 'visible') return;
@@ -161,16 +142,15 @@ export class ScreenAwake {
   }
 
   /**
-   * ⚠ **Whatever is in hand here is stale, and asking it is the bug.** The
-   * browser drops the lock every time the document stops being visible, so on
-   * the way back there is nothing held by definition — but `released` is written
-   * only by JS running in the page, and a process Android froze in the
-   * background had none to run. It thaws with a handle reporting itself live
-   * over a lock the platform took back. Believing it left the button lit over a
-   * screen that went dark, for the rest of the session, with nothing said.
+   * ⚠ **Whatever is in hand here is stale, and asking it is the bug.** The browser drops
+   * the lock whenever the document stops being visible, so on the way back nothing is
+   * held by definition — but `released` is written only by JS running in the page, and a
+   * process Android froze had none to run. It thaws with a handle reporting itself live
+   * over a lock the platform took back, which left the button lit over a dark screen for
+   * the rest of the session with nothing said.
    *
-   * So the handle is let go rather than consulted. `wanted` is the state that
-   * survives a hide; the sentinel is not, and must not be treated as evidence.
+   * So the handle is let go rather than consulted: `wanted` survives a hide, the
+   * sentinel does not, and it is not evidence.
    */
   private readonly onVisible = (): void => {
     if (this.doc.visibilityState !== 'visible' || !this.wanted) return;
@@ -180,21 +160,18 @@ export class ScreenAwake {
   /**
    * Get a fresh lock, then let the old one go — in that order.
    *
-   * ⚠ **Releasing first leaves a window holding nothing**, which was tolerable
-   * while this ran only on a return to the front (the browser had already taken
-   * the lock back, so there was nothing to drop) and is not now that it runs
-   * every fifteen seconds. Two costs, and the second is the one that would have
-   * been hard to find: the screen is briefly unclaimed, and `awake-watch.sh`
-   * samples the phone once a minute for exactly the state "button lit, no lock"
-   * — so a gap of our own making would eventually be sampled and logged as a
-   * FAULT. The instrument would have been reporting the fix.
+   * ⚠ **Releasing first leaves a window holding nothing.** Tolerable while this ran only
+   * on a return to the front, since the browser had already taken the lock back; not now
+   * that it runs every fifteen seconds. The screen is briefly unclaimed — and
+   * `awake-watch.sh` samples the phone once a minute for exactly "button lit, no lock",
+   * so a gap of our own making would eventually be logged as a FAULT and the instrument
+   * would be reporting the fix.
    *
-   * Holding two locks for the width of one `release()` is harmless: the window
-   * flag and `dumpsys power` both read "a lock is held", which is the truth.
+   * Holding two locks for the width of one `release()` is harmless: the window flag and
+   * `dumpsys power` both read "a lock is held", which is true.
    *
-   * A refused request puts the old handle back rather than leaving nothing —
-   * it may be dead, but a dead handle is no worse than none and dropping the
-   * reference would leak a lock the process can never release.
+   * A refused request puts the old handle back rather than leaving nothing — it may be
+   * dead, but dropping the reference would leak a lock the process can never release.
    */
   private async retake(): Promise<void> {
     const held = this.sentinel;
@@ -211,22 +188,18 @@ export class ScreenAwake {
 
   private async take(): Promise<void> {
     if (this.sentinel && !this.sentinel.released) return;
-    // One request in flight at a time. Asking again on every return is what
-    // makes this necessary: two transitions in quick succession would both find
-    // nothing in hand, both be handed a lock, and only the last handle be kept —
-    // leaving the other held until the process dies, which is a screen that can
-    // never sleep again.
+    // ⚠ One request in flight at a time: two transitions in quick succession would both
+    // find nothing in hand, both be handed a lock, and only the last handle be kept —
+    // leaving the other held until the process dies, i.e. a screen that can never sleep.
     if (this.taking) return;
     this.taking = true;
     try {
       this.sentinel = await this.view?.navigator.wakeLock.request('screen');
     } catch (err: unknown) {
-      // ⚠ **Only a refusal that happened in front of somebody is a refusal.**
-      // A request made while the page is hidden is rejected by every browser
-      // that implements this, and a restored choice on a cold start can land in
-      // exactly that moment. Turning it off there would silently undo a decision
-      // nobody was present for; the next return to the front asks again, and
-      // that is when the answer means something.
+      // ⚠ **Only a refusal in front of somebody is a refusal.** Every browser rejects a
+      // request made while the page is hidden, and a restored choice on a cold start can
+      // land in exactly that moment. Turning it off there would silently undo a decision
+      // nobody was present for; the next return to the front asks again.
       if (this.doc.visibilityState !== 'visible') return;
       this.announce(false);
       this.remember(false);
@@ -239,8 +212,8 @@ export class ScreenAwake {
   private async drop(): Promise<void> {
     const held = this.sentinel;
     this.sentinel = undefined;
-    // Releasing a lock the browser has already taken back rejects, and letting
-    // go of the screen is not worth an unhandled rejection.
+    // Releasing a lock the browser already took back rejects, and letting go of the
+    // screen is not worth an unhandled rejection.
     if (held && !held.released) await held.release().catch(() => undefined);
   }
 
@@ -250,9 +223,8 @@ export class ScreenAwake {
     this.config.onChange?.(on);
   }
 
-  // Storage is wrapped because a WebView can have it refused outright. An app
-  // that cannot remember the choice still keeps the screen on for this visit,
-  // and nothing on screen changes, so nothing is said about it.
+  // Wrapped because a WebView can have storage refused outright. An app that cannot
+  // remember the choice still keeps the screen on for this visit, so nothing is said.
   private remember(on: boolean): void {
     try {
       this.view?.localStorage.setItem(this.key, on ? 'yes' : 'no');

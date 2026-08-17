@@ -1,15 +1,12 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-// TYPE-ONLY import — erased at transpile, so this module pulls in NO copy of
-// @playwright/test at runtime. That's deliberate: a consuming app resolves
-// `@playwright/test` from its OWN node_modules, and if this shared module
-// loaded a second copy, Playwright sees two instances and every suite dies
-// with "No tests found". So the assertions here throw plain Errors rather than
-// calling `expect()`; the app's own specs keep using the real `expect`.
+// ⚠ TYPE-ONLY, so this module pulls in NO copy of @playwright/test at runtime. A
+// consuming app resolves it from its OWN node_modules, and a second copy makes
+// Playwright see two instances and every suite die with "No tests found". Hence the
+// assertions here throw plain Errors; the app's own specs keep using real `expect`.
 import type { Locator, Page, TestInfo } from "@playwright/test";
 
-/** A layout assertion failed. Thrown (not `expect`) so this module needs no
- *  @playwright/test at runtime — see the import note above. */
+/** A layout assertion failed. Thrown, not `expect`ed — see the import note above. */
 class LayoutError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -19,32 +16,26 @@ class LayoutError extends Error {
 
 /**
  * ui-harness — the fleet's shared phone-width layout checks (L2 of
- * dev-lint/docs/layout-quality-architecture.md). Render a page in a real
- * browser at true device geometry and assert about the *painted pixels*,
- * not the source. Born in the life app from a string of bugs that all read
- * fine in code and were only visible on the phone: a 497px toggle row in a
- * 380px sheet, nested scrollers that broke swipe, text colliding at 412px.
+ * dev-lint/docs/layout-quality-architecture.md). Render a page in a real browser at
+ * true device geometry and assert about the *painted pixels*, not the source. Born in
+ * the life app from bugs that all read fine in code and were only visible on the
+ * phone: a 497px toggle row in a 380px sheet, nested scrollers that broke swipe, text
+ * colliding at 412px.
  *
- * Consumed by RELATIVE import from each app's e2e/ (Playwright transpiles
- * TS outside node_modules; a file: dep symlink would not be transpiled).
- * Change here → run this package's own fixture specs (npm test) — five
- * apps ride on these functions.
+ * Consumed by RELATIVE import from each app's e2e/ — Playwright transpiles TS outside
+ * node_modules, and a `file:` dep symlink would not be transpiled. Five apps ride on
+ * these functions, so a change here means running this package's own fixture specs.
  *
- * Every `find*` below is serialised by `page.evaluate` and re-parsed inside the
- * browser, so it closes over NOTHING from this module — only its `args`. That is
- * why the small `describe(el)` selector helper is written out again in each of
- * them rather than hoisted: a shared one would be out of scope in the page and
- * throw `ReferenceError` at the first offender it tried to name. Hoisting it
- * would need a string prelude injected per evaluate, which costs more than the
- * copies do.
+ * ⚠ Every `find*` below is serialised by `page.evaluate` and re-parsed inside the
+ * browser, so it closes over NOTHING from this module — only its `args`. That is why
+ * the small `describe(el)` helper is written out again in each rather than hoisted: a
+ * shared one is out of scope in the page and throws `ReferenceError` at the first
+ * offender it tries to name.
  *
- * The core signal is text-on-text collision. In a correct layout, no two
- * pieces of text ever share the same pixels. We measure each piece of
- * rendered text at the glyph level — `Range.getClientRects()` returns one
- * box per *visual line*, so wrapping is handled and a paragraph that wraps
- * around an inline `<b>` doesn't produce one giant union box that spuriously
- * overlaps its own child. Two such glyph boxes intersecting is, with very
- * few exceptions, a real bug.
+ * The core signal is text-on-text collision: in a correct layout no two pieces of text
+ * share pixels. Measured at the glyph level, since `Range.getClientRects()` returns one
+ * box per *visual line* — so wrapping is handled, and a paragraph wrapping around an
+ * inline `<b>` does not produce one union box that spuriously overlaps its own child.
  */
 
 /** A single rendered line of text and where it sits in the viewport. */
@@ -192,24 +183,22 @@ export interface ClippedText {
 }
 
 /**
- * Runs in the browser. The failure class neither overlap nor overflow can see:
- * visible text whose TOP or BOTTOM is sheared off by an overflow-clipping
- * ancestor and **cannot be scrolled back into view** — the "label cut in half"
- * bug (life's Find-on-Waitrose "Search" label, halved by `mat-dialog-content`'s
- * zeroed top padding). Deliberately the inverse of the clip-to-ancestor logic in
- * findTextOverlaps: there, paint-clipped text is discarded so it can't collide;
- * here, that same clipping IS the defect when it eats a live glyph for good.
+ * Runs in the browser. The failure class neither overlap nor overflow can see: visible
+ * text whose TOP or BOTTOM is sheared off by an overflow-clipping ancestor and **cannot
+ * be scrolled back into view** — the "label cut in half" bug (life's Find-on-Waitrose
+ * "Search" label, halved by `mat-dialog-content`'s zeroed top padding). The inverse of
+ * findTextOverlaps' clip-to-ancestor logic: there, paint-clipped text is discarded so
+ * it cannot collide; here that same clipping IS the defect.
  *
- * The scroll test is what keeps it honest: text off the top of a scroller you've
- * scrolled down past is transient (scroll up and it's back) — only a clip in a
- * direction the container CAN'T scroll is a permanent shear. An `overflow:hidden`
- * box never scrolls, so any partial clip there is permanent. Normal padded
+ * ⚠ The scroll test is what keeps it honest. Text off the top of a scroller you have
+ * scrolled past is transient — only a clip in a direction the container CANNOT scroll
+ * is a permanent shear, and an `overflow:hidden` box never scrolls. Normal padded
  * content never trips it: the first line box sits at the padding edge, INSIDE the
- * ancestor box, so there's nothing above to cut.
+ * ancestor, so there is nothing above to cut.
  *
- * `args` is [rootSel, minPx]: scope to a container (an open dialog), and ignore
- * shears under `minPx` (sub-pixel line-leading, antialiasing). Horizontal clips
- * are out of scope — that's findHorizontalOverflow (and legit ellipsis).
+ * `args` is [rootSel, minPx]: scope to a container, and ignore shears under `minPx`
+ * (sub-pixel line-leading, antialiasing). Horizontal clips belong to
+ * findHorizontalOverflow.
  */
 export function findClippedText(args: [string | null, number]): ClippedText[] {
 	const [rootSel, minPx] = args;
@@ -293,30 +282,28 @@ export interface ClippedIcon {
 }
 
 /**
- * Runs in the browser. The failure class the text checks deliberately skip:
- * an icon squeezed BELOW its glyph and clipped by its own box.
+ * Runs in the browser. The failure class the text checks deliberately skip: an icon
+ * squeezed BELOW its glyph and clipped by its own box.
  *
  * `mat-icon` ships with `overflow: hidden`, and a flex item whose overflow is not
  * `visible` loses the `min-width: auto` floor that stops it collapsing below its
- * content. Put one beside a text sibling — whose `flex-basis: auto` resolves to
- * the whole unwrapped sentence — and the icon absorbs nearly all of the row's
- * shrink. It is then clipped rather than scaled, so it paints as a fragment of a
- * glyph (recall's "Still being finalized" banner: 9.6px of a 24px hourglass,
- * while the shorter sentence beside it lost 0.7px and looked fine).
+ * content. Put one beside a text sibling — whose `flex-basis: auto` resolves to the
+ * whole unwrapped sentence — and the icon absorbs nearly all the row's shrink, then is
+ * clipped rather than scaled, painting as a fragment of a glyph (recall's "Still being
+ * finalized" banner: 9.6px of a 24px hourglass, while the sentence beside it lost
+ * 0.7px and looked fine).
  *
- * Nothing else here can see it. There is no horizontal overflow — shrinking is
- * precisely what avoids overflow — no text overlap, and no occlusion.
- * findClippedText skips icon ligatures on purpose (an icon straddling a clip edge
- * is not a sheared word) and only looks at vertical shear.
+ * Nothing else here can see it: shrinking is precisely what avoids overflow, so there
+ * is no horizontal overflow, no text overlap and no occlusion, and findClippedText
+ * skips icon ligatures on purpose.
  *
- * The discriminator is the painted box against the FONT-SIZE, not scrollWidth: if
- * the icon font has not loaded, the element's content is the literal ligature word
- * and scrollWidth is huge, which would flag every icon in the app. Font-size is
- * stable either way — pair this with expectIconFontLoaded, which is the check that
- * owns that failure.
+ * ⚠ The discriminator is the painted box against the FONT-SIZE, not scrollWidth: with
+ * the icon font unloaded the content is the literal ligature word and scrollWidth is
+ * huge, which would flag every icon in the app. Font-size is stable either way — pair
+ * this with expectIconFontLoaded, which owns that failure.
  *
- * `args` is [rootSel, minPx]: scope to a container, and ignore squeezes under
- * `minPx` (sub-pixel rounding; a 0.7px loss is invisible and not worth a failure).
+ * `args` is [rootSel, minPx]: scope to a container, and ignore squeezes under `minPx`
+ * (sub-pixel rounding; a 0.7px loss is invisible and not worth a failure).
  */
 export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
 	const [rootSel, minPx] = args;
@@ -414,21 +401,19 @@ export interface Overflower {
 }
 
 /**
- * Runs in the browser. The other layout failure class at a phone width: content
- * wider than the screen. A too-wide element either forces a horizontal page
- * scroll (nothing on a phone should scroll sideways) or spills out of a fixed
- * container like a bottom sheet. The mat-button-toggle-group is the classic
- * culprit — it lays its options in one non-wrapping row, so five typed options
- * with icons happily exceed 412px.
+ * Runs in the browser. The other phone-width failure class: content wider than the
+ * screen, which either forces a horizontal page scroll or spills out of a fixed
+ * container like a bottom sheet. `mat-button-toggle-group` is the classic culprit — one
+ * non-wrapping row, so five typed options with icons exceed 412px.
  *
- * We flag every visible element whose right edge sits more than `tol` past
- * `root`'s right edge — EXCEPT ones inside a container named in `allow`, an
- * explicit list of selectors for the few places that scroll horizontally on
- * purpose. Explicit, because the "obvious" computed-style test (overflow-x:
- * auto/scroll) is a trap: per CSS, `overflow-y: auto` forces overflow-x to
- * compute to auto as well, so every merely-vertically-scrollable container
- * (a bottom sheet's body, say) silently exempted everything inside it — which
- * is exactly how a 497px toggle row hid inside a 380px sheet.
+ * Flags every visible element whose right edge sits more than `tol` past `root`'s,
+ * except inside a container named in `allow`.
+ *
+ * ⚠ `allow` is an explicit list because the "obvious" computed-style test (overflow-x:
+ * auto/scroll) is a trap: per CSS, `overflow-y: auto` forces overflow-x to compute to
+ * auto as well, so every merely-vertically-scrollable container silently exempted
+ * everything inside it — which is how a 497px toggle row hid inside a 380px sheet.
+ *
  * `args` is [rootSel|null, tol, allow]; a null root means the viewport.
  */
 export function findHorizontalOverflow(args: [string | null, number, string[]]): {
@@ -467,14 +452,12 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 	for (const el of Array.from(root.querySelectorAll("*"))) {
 		const style = getComputedStyle(el);
 		if (style.visibility === "hidden" || style.display === "none") continue;
-		// position:fixed/sticky elements — AND their descendants — are out of normal
-		// flow: they never add to the document's scrollWidth, so they can't cause the
-		// horizontal PAGE scroll this check targets. And a viewport-width fixed bar
-		// (a bottom nav pinned `inset: auto 0 0 0`) spans the full innerWidth, so once
-		// a vertical scrollbar shrinks clientWidth the bar — and every child laid out
-		// inside it — appears to "spill" by exactly the scrollbar width, a phantom
-		// every scrolling page would trip. A fixed element with genuinely off-screen
-		// content is the occlusion check's concern, not page-scroll overflow.
+		// fixed/sticky elements AND their descendants are out of normal flow: they never
+		// add to scrollWidth, so they cannot cause the page scroll this targets. And a
+		// viewport-width fixed bar spans the full innerWidth, so once a vertical
+		// scrollbar shrinks clientWidth the bar — and everything laid out inside it —
+		// appears to spill by exactly the scrollbar width, a phantom every scrolling
+		// page would trip. Genuinely off-screen fixed content is the occlusion check's.
 		let inFixed = false;
 		for (let p: Element | null = el; p; p = p.parentElement) {
 			const pos = getComputedStyle(p).position;
@@ -563,22 +546,20 @@ export interface Occlusion {
 }
 
 /**
- * Runs in the browser. The third layout failure class, and the one neither
- * text-overlap nor horizontal-overflow can see: an interactive control drawn
- * UNDER a fixed bar. Text-overlap can't catch it (a button's label isn't
- * colliding with anything — it's occluded, painted behind); overflow can't
- * (the element fits the viewport fine — it's just hidden). Found live in coach:
- * the log-a-set FAB sank behind the bottom nav in wide mode when a media query
- * dropped its nav-clearance.
+ * Runs in the browser. The third failure class, invisible to both checks above: an
+ * interactive control drawn UNDER a fixed bar. Text-overlap cannot catch it (the label
+ * collides with nothing — it is painted behind), overflow cannot (the element fits the
+ * viewport, it is just hidden). Found live in coach, where the log-a-set FAB sank
+ * behind the bottom nav once a media query dropped its nav-clearance.
  *
- * For each visible control matching `selector`, hit-test its own centre with
- * `document.elementFromPoint`: a reachable control returns itself (or a
- * descendant — the ripple/icon inside a mat-fab); anything else on top means
- * it's occluded and can't be tapped. Controls whose centre is off-screen are
- * skipped (that's a scroll concern, not occlusion). `elementFromPoint` honours
- * `pointer-events`, so a `pointer-events:none` overlay wrapper is transparent
- * and doesn't false-positive. `args` is [selector, allow] — `allow` names
- * containers whose controls are intentionally covered (an open modal's backdrop).
+ * Hit-tests each visible control's own centre with `document.elementFromPoint`: a
+ * reachable control returns itself or a descendant, anything else on top means it
+ * cannot be tapped. Controls whose centre is off-screen are skipped — a scroll concern,
+ * not occlusion. `elementFromPoint` honours `pointer-events`, so a
+ * `pointer-events:none` overlay wrapper is transparent and does not false-positive.
+ *
+ * `args` is [selector, allow]; `allow` names containers whose controls are
+ * intentionally covered, such as an open modal's backdrop.
  */
 export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 	const [selector, allow] = args;
@@ -662,17 +643,15 @@ export async function expectViewportIsPhone(page: Page, width = 412): Promise<vo
 }
 
 /**
- * Assert the icon font face is present AND loaded, so `mat-icon` ligatures
- * render as glyphs rather than their literal fallback word — a `mat-icon`
- * showing the text "search" (because the icon font isn't loaded) is the exact
- * bug that shipped once when the wrong font family was linked, and it also
+ * Assert the icon font face is present AND loaded, so `mat-icon` ligatures render as
+ * glyphs rather than their literal fallback word. A `mat-icon` showing the text
+ * "search" is the bug that shipped once when the wrong family was linked, and it also
  * reads as a text overlap against the field it sits in.
  *
- * `document.fonts.check('24px "Material Icons"')` is NOT usable here: it
- * returns `true` even when the family doesn't exist (nothing to load). We
- * require a FontFace with that family in the set at `status === "loaded"`.
- * Fonts load lazily once a glyph uses them, so poll until it settles; a
- * missing family never settles → fails. `family` names the icon font face.
+ * ⚠ `document.fonts.check('24px "Material Icons"')` is NOT usable: it returns `true`
+ * even when the family does not exist, there being nothing to load. This requires a
+ * FontFace with that family in the set at `status === "loaded"`. Fonts load lazily once
+ * a glyph uses them, so it polls until settled; a missing family never settles.
  */
 export async function expectIconFontLoaded(page: Page, family = "Material Icons"): Promise<void> {
 	const loaded = await page
@@ -859,19 +838,17 @@ export function findCanvasContrast([selector, minAlpha]: [string, number]): Canv
  * Assert every canvas on the page painted marks that are actually visible
  * against the page behind them.
  *
- * Canvas is the one place in an Angular app where the stylesheet does not
- * reach: `ctx.fillStyle = <unparseable>` is ignored IN SILENCE, leaving the
- * previous colour (black, on a fresh context). Material's system tokens compute
- * to `light-dark(#1d1b1e, #e6e1e6)` — a CSS function no canvas can parse — so
- * handing one straight through paints black on a dark background with nothing
- * anywhere reporting a problem. dev-lint's DL-CANVAS-SYSTEM-TOKEN catches the
- * known shape statically; this catches the CLASS, whatever produced it.
+ * ⚠ Canvas is the one place in an Angular app the stylesheet does not reach:
+ * `ctx.fillStyle = <unparseable>` is ignored IN SILENCE, leaving the previous colour
+ * (black, on a fresh context). Material's system tokens compute to
+ * `light-dark(#1d1b1e, #e6e1e6)` — a CSS function no canvas can parse — so handing one
+ * straight through paints black on a dark background with nothing reporting a problem.
+ * dev-lint's DL-CANVAS-SYSTEM-TOKEN catches the known shape statically; this catches
+ * the CLASS, whatever produced it, by reading the pixels — the layout checks measure
+ * geometry, unit tests never rasterise, and the page is perfectly valid.
  *
- * Nothing else sees it: the layout checks measure geometry, unit tests never
- * rasterise, and the page is perfectly valid. So this reads the pixels.
- *
- * Call it under `page.emulateMedia({ colorScheme })` for BOTH schemes — the
- * classic form of this bug is invisible in light mode.
+ * ⚠ Call it under `page.emulateMedia({ colorScheme })` for BOTH schemes: the classic
+ * form of this bug is invisible in light mode.
  */
 export async function expectCanvasLegible(
 	page: Page,
