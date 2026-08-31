@@ -74,6 +74,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "pnpm install (frozen, from the lockfile)"
         , argv = web [ "pnpm", "install", "--frozen-lockfile" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  Pinned to dev-lint's committed HEAD — see the header. Not
@@ -91,6 +92,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "tsc build (emits the published dist/ + .d.ts)"
         , argv = web [ "pnpm", "run", "build" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  src/*.spec.ts — the label rules and the flattener behind the shared
@@ -100,6 +102,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "vitest unit specs"
         , argv = web [ "pnpm", "run", "test:unit" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  Lint only — the formatter stays off, because src/ is tab-indented and
@@ -111,6 +114,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "biome (lint)"
         , argv = web [ "pnpm", "run", "lint" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  The build above covers src/ only, under a config that emits. This is
@@ -124,6 +128,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "tsc typecheck (whole repo, noEmit)"
         , argv = web [ "pnpm", "run", "typecheck" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  Chromium comes from playwright's own cache; the install is idempotent
@@ -132,6 +137,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "playwright chromium is installed"
         , argv = web [ "pnpm", "exec", "playwright", "install", "chromium" ]
+        , env = G.nonInteractive
         , timeout_s = 900
         }
       , {-  The specs in tests/ exercise the measurement functions against
@@ -141,6 +147,7 @@ in  { name = "ui-harness"
         G.Check::{
         , name = "playwright fixture specs (measurement fns @ phone geometry)"
         , argv = web [ "pnpm", "test" ]
+        , env = G.nonInteractive
         , timeout_s = 1800
         }
       , {-  dev-lint's DL-KTLINT discovers apps by

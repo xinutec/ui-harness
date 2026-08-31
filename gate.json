@@ -12,7 +12,9 @@
         "--frozen-lockfile"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "pnpm install (frozen, from the lockfile)",
       "timeout_s": 900
     },
@@ -41,7 +43,9 @@
         "build"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "tsc build (emits the published dist/ + .d.ts)",
       "timeout_s": 900
     },
@@ -57,7 +61,9 @@
         "test:unit"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "vitest unit specs",
       "timeout_s": 900
     },
@@ -73,7 +79,9 @@
         "lint"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "biome (lint)",
       "timeout_s": 900
     },
@@ -89,7 +97,9 @@
         "typecheck"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "tsc typecheck (whole repo, noEmit)",
       "timeout_s": 900
     },
@@ -107,7 +117,9 @@
         "chromium"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "playwright chromium is installed",
       "timeout_s": 900
     },
@@ -122,7 +134,9 @@
         "test"
       ],
       "cwd": ".",
-      "env": {},
+      "env": {
+        "CI": "true"
+      },
       "name": "playwright fixture specs (measurement fns @ phone geometry)",
       "timeout_s": 1800
     },
