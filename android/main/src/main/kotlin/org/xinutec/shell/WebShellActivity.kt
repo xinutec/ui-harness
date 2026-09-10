@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -175,6 +176,23 @@ abstract class WebShellActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         startUrl(intent)?.let { web.loadUrl(it) }
+    }
+
+    /**
+     * Commit cookies to disk before the process can be killed.
+     *
+     * WebView's cookie store is in memory and writes through lazily. Swiping the
+     * app away kills the process outright, and anything not yet committed is
+     * simply gone — including a freshly-set login cookie. The symptom is having
+     * to sign in on every cold start while the server-side session is still
+     * perfectly valid for days.
+     *
+     * `onPause` and not `onStop`: it is the last callback Android guarantees
+     * before a process may be killed.
+     */
+    override fun onPause() {
+        CookieManager.getInstance().flush()
+        super.onPause()
     }
 
     // `configChanges` keeps the Activity across rotation, so this only fires on a
