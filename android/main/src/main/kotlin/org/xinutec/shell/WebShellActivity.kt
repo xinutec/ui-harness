@@ -124,6 +124,11 @@ abstract class WebShellActivity : ComponentActivity() {
                     )
                 settings.javaScriptEnabled = true // Angular needs JS
                 settings.domStorageEnabled = true // localStorage / sessionStorage
+                // WebView blocks autoplay without a user gesture by DEFAULT, which
+                // no <video autoplay muted> can override from the page side. A
+                // silent looping demo then renders as a grey box with a play
+                // button, which looks like a broken video rather than a policy.
+                settings.mediaPlaybackRequiresUserGesture = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
                 // Every app here loads one remote origin over https and nothing
