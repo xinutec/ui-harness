@@ -999,12 +999,19 @@ export interface StarvedText {
  * of itself is a layout fault wearing the feature's clothes. `minVisible` is
  * where one becomes the other; default 0.5, deliberately permissive.
  *
- * `args` is [rootSel, minVisible, minChars]. `minChars` skips short strings: a
- * two-character label clipped to one is noise, and the ratio is violent on small
- * numbers.
+ * `args` is [rootSel, minVisible, minChars, allow]. `minChars` skips short
+ * strings: a two-character label clipped to one is noise, and the ratio is
+ * violent on small numbers.
+ *
+ * ⚠ `allow` exempts BY SELECTOR, the way findHorizontalOverflow's does, because
+ * some truncation is the design and not a fault. life's item rows deliberately
+ * starve their fact line so the expiry beside it survives at full width — it
+ * measures 31% and that is the intended trade. Exempting it by name keeps the
+ * check on everything else in the row, where a title at 31% IS the bug this
+ * exists for. Switching the whole page off would lose both.
  */
-export function findStarvedText(args: [string | null, number, number]): StarvedText[] {
-	const [rootSel, minVisible, minChars] = args;
+export function findStarvedText(args: [string | null, number, number, string[]]): StarvedText[] {
+	const [rootSel, minVisible, minChars, allow] = args;
 	const root = rootSel ? document.querySelector(rootSel) : document.body;
 	if (!root) return [];
 	const describe = (el: Element): string => {
@@ -1014,10 +1021,12 @@ export function findStarvedText(args: [string | null, number, number]): StarvedT
 				: "";
 		return el.tagName.toLowerCase() + cls;
 	};
+	const exempt = (el: Element): boolean => allow.some((sel) => el.closest(sel) !== null);
 	const out: StarvedText[] = [];
 	for (const el of Array.from(root.querySelectorAll("*"))) {
 		const st = getComputedStyle(el);
 		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		if (exempt(el)) continue;
 		// Only elements that truncate: ellipsis (or a hard clip) on a single line.
 		// A wrapping element does not hide anything horizontally.
 		if (st.whiteSpace !== "nowrap" && st.whiteSpace !== "pre") continue;
@@ -1057,14 +1066,16 @@ export async function expectNoStarvedText(
 	page: Page,
 	testInfo: TestInfo,
 	rootSel: string | null = null,
+	allow: string[] = [],
 	minVisible = 0.5,
 	minChars = 8,
 ): Promise<void> {
 	await leaveSnapshot(page, testInfo);
-	const starved = await page.evaluate(findStarvedText, [rootSel, minVisible, minChars] as [
+	const starved = await page.evaluate(findStarvedText, [rootSel, minVisible, minChars, allow] as [
 		string | null,
 		number,
 		number,
+		string[],
 	]);
 	if (starved.length === 0) return;
 	const detail = starved

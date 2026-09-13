@@ -527,7 +527,7 @@ const starve = (titleWidth: string, text: string): string => `
 
 test('detects a title ellipsized down to a fraction of itself', async ({ page }) => {
   await page.setContent(phonePage(starve('60px', 'Milk (semi-skimmed) from the corner shop')));
-  const found = await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number]);
+  const found = await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]]);
   expect(found.length).toBe(1);
   expect(first(found).visible).toBeLessThan(0.3);
 });
@@ -536,12 +536,12 @@ test('does NOT flag a title that loses only its tail', async ({ page }) => {
   // Ellipsis is usually the feature working. Losing a little is not a fault, and
   // a rule that says otherwise is a rule every dense list has to waive.
   await page.setContent(phonePage(starve('260px', 'Milk (semi-skimmed) from the shop')));
-  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]])).toEqual([]);
 });
 
 test('does NOT flag text that fits, however nowrap it is', async ({ page }) => {
   await page.setContent(phonePage(starve('300px', 'Short name')));
-  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]])).toEqual([]);
 });
 
 test('does NOT flag a WRAPPING element, which hides nothing horizontally', async ({ page }) => {
@@ -551,12 +551,12 @@ test('does NOT flag a WRAPPING element, which hides nothing horizontally', async
       Milk (semi-skimmed) from the corner shop
     </div>`),
   );
-  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]])).toEqual([]);
 });
 
 test('does NOT flag a short label, where the ratio is violent and the loss is not', async ({ page }) => {
   await page.setContent(phonePage(starve('12px', 'Qty')));
-  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]])).toEqual([]);
 });
 
 test('names the element that truncates, not an ancestor that merely contains it', async ({ page }) => {
@@ -569,7 +569,26 @@ test('names the element that truncates, not an ancestor that merely contains it'
                                  white-space: nowrap;">Milk (semi-skimmed) from the shop</span>
     </div>`),
   );
-  const found = await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number]);
+  const found = await page.evaluate(findStarvedText, [null, 0.5, 8, []] as [string | null, number, number, string[]]);
+  expect(found.length).toBe(1);
+  expect(first(found).by).toBe('span.title');
+});
+
+test('the allow-list exempts truncation that IS the design', async ({ page }) => {
+  // life's item rows starve their fact line on purpose so the expiry beside it
+  // survives at full width. Exempting it by name must not switch off the check
+  // on the title in the same row, which is exactly what this oracle is for.
+  await page.setContent(
+    phonePage(`
+    <div style="display: flex; flex-direction: column; width: 320px; font: 16px sans-serif;">
+      <span class="title" style="width: 60px; overflow: hidden; text-overflow: ellipsis;
+                                 white-space: nowrap;">Milk (semi-skimmed) from the shop</span>
+      <span class="facts" style="width: 60px; overflow: hidden; text-overflow: ellipsis;
+                                 white-space: nowrap;">1 box · Kitchen › Fridge · food</span>
+    </div>`),
+  );
+  const args = [null, 0.5, 8, ['.facts']] as [string | null, number, number, string[]];
+  const found = await page.evaluate(findStarvedText, args);
   expect(found.length).toBe(1);
   expect(first(found).by).toBe('span.title');
 });
