@@ -11,6 +11,12 @@
 #
 # It never bypasses a gate and never uses `git add -A`: only the three files a
 # bump writes are staged, by name.
+#
+# ⚠ The commit message is READ FROM THE HARNESS COMMIT, not written here. It used
+# to be a heredoc typed in for one bump, and it stayed — so this script sat in the
+# tree for weeks ready to tell thirteen repos they were taking a wake-lock fix, no
+# matter what the bump actually was. A message that has to be remembered is a
+# message that goes stale; `git log` already knows what changed.
 # ⚠ Every test below is `if`-guarded rather than written `[ … ] && arr+=(…)`.
 # That form returns the test's status, so a false one aborts the whole run under
 # `set -e` — silently skipping the repos after it.
@@ -18,7 +24,16 @@ set -euo pipefail
 
 SHA="${1:?usage: land-bump.sh <40-char sha>}"
 CODE="$(cd "$(dirname "$0")/../.." && pwd)"
+HARNESS="$(cd "$(dirname "$0")/.." && pwd)"
 PINS=(frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml)
+
+# Fail here rather than after the first repo is already committed: a sha that does
+# not resolve means the pins point at nothing, and half a landed bump is worse
+# than none.
+if ! WHAT="$(git -C "$HARNESS" log -1 --format=%B "$SHA" 2>/dev/null)"; then
+  echo "land-bump: $SHA is not a commit in $HARNESS" >&2
+  exit 1
+fi
 
 passed=(); failed=(); skipped=()
 
@@ -41,17 +56,9 @@ for repo in "$CODE"/*/; do
   echo "=== $name: ${staged[*]} ==="
   git -C "$repo" add "${staged[@]}"
   if git -C "$repo" commit -q -F - <<EOF
-frontend: take the harness fix for a wake lock nobody was holding
+frontend: take ui-harness ${SHA:0:12}
 
-ui-harness $SHA. The awake button could be lit, the choice remembered,
-and no KEEP_SCREEN_ON held anywhere on the device — the screen timed out
-under a button that said it would not.
-
-Android freezes a backgrounded process and takes the lock back with no
-JS left to run, so the app thaws holding a sentinel that still reports
-itself live. Returning to the front now drops that handle rather than
-asking it, with one request in flight so the retry cannot leak a lock
-nobody holds a handle to.
+$WHAT
 EOF
   then
     if git -C "$repo" push -q 2>&1; then

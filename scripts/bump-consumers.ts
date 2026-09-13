@@ -6,6 +6,15 @@
  *   node scripts/bump-consumers.ts              # dry run against HEAD
  *   node scripts/bump-consumers.ts --apply
  *   node scripts/bump-consumers.ts --apply <sha>
+ *   node scripts/bump-consumers.ts --only life --apply
+ *
+ * `--only` narrows the run to named repos. The whole-fleet bump is still the
+ * point, but it refuses outright when ANY repo it would touch has uncommitted
+ * work — and with thirteen consumers and several sessions in the tree at once,
+ * that is the usual state, not the exception. Without a way to narrow it, one
+ * neighbour's half-finished edit blocks a harness fix its own app needs, and the
+ * way round is hand-editing three files, which is what this script exists
+ * because someone did.
  *
  * WHY THE PIN EXISTS. Consumers pin the harness to a 40-char commit rather than
  * tracking `main`, so a build is reproducible and a harness push never changes
@@ -226,8 +235,23 @@ function tidy(entry: { repo: string; dir: string }, sha: string, apply: boolean)
 
 function main(): void {
   const argv = process.argv.slice(2);
-  const apply = argv[0] === '--apply';
-  const sha = (apply ? argv[1] : argv[0]) ?? git(['rev-parse', 'HEAD']);
+  // `--only a,b` or `--only a --only b`, in any position: the flag reads as a
+  // filter over consumers, not as a positional, so it composes with a sha.
+  const only = new Set<string>();
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--only') {
+      const names = argv[i + 1];
+      if (names === undefined) fail('--only needs a repo name');
+      for (const name of names.split(',')) only.add(name);
+      i += 1;
+      continue;
+    }
+    if (arg !== undefined) rest.push(arg);
+  }
+  const apply = rest[0] === '--apply';
+  const sha = (apply ? rest[1] : rest[0]) ?? git(['rev-parse', 'HEAD']);
 
   if (!/^[0-9a-f]{40}$/.test(sha)) fail(`not a full 40-char commit: ${sha}`);
   // A pin nobody else can fetch is worse than no pin: every consumer's install
@@ -251,7 +275,12 @@ function main(): void {
   // guard read EVERY consumer, so unrelated work in a repo already at `sha`
   // refused a bump that would never have gone near it. Scope the question to the
   // repos actually being written to.
-  const willTouch = consumers().filter(
+  const targets = consumers().filter((entry) => only.size === 0 || only.has(entry.repo));
+  // A typo in `--only` must not read as "nothing to do, all green".
+  const unknown = [...only].filter((name) => !targets.some((entry) => entry.repo === name));
+  if (unknown.length > 0) fail(`not a consumer of ${PKG}: ${unknown.join(', ')}`);
+
+  const willTouch = targets.filter(
     (entry) => pinnedCommit(entry.manifest) !== sha || tidy(entry, sha, false) !== '',
   );
   if (apply) {
@@ -273,7 +302,7 @@ function main(): void {
   }
 
   let changed = 0;
-  for (const entry of consumers()) {
+  for (const entry of targets) {
     const current = pinnedCommit(entry.manifest);
     if (current === sha) {
       // ⚠ **Already pinned is where residue survives**, and skipping outright is
@@ -295,7 +324,8 @@ function main(): void {
   }
 
   console.log();
-  if (changed === 0) console.log(`every consumer is already at ${sha.slice(0, 12)}`);
+  const scope = only.size === 0 ? 'every consumer' : [...only].join(', ');
+  if (changed === 0) console.log(`${scope} already at ${sha.slice(0, 12)}`);
   else if (apply) console.log(`${changed} repo(s) updated. Run each one's verify, then commit.`);
   else console.log(`${changed} repo(s) would change. Re-run with --apply to do it.`);
 }
