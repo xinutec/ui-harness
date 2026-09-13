@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allowBoth, foreignChanges, rewriteAllowBuilds } from './bump-consumers.ts';
+import { allowBoth, foreignChanges, rewriteAllowBuilds, vendorsPnpmDeps } from './bump-consumers.ts';
 
 /**
  * The half of a bump that used to be left behind.
@@ -151,5 +151,25 @@ describe('foreignChanges', () => {
     // and passed throughout.
     const porcelain = ' M frontend/package.json\n M frontend/pnpm-lock.yaml'.trim();
     expect(foreignChanges(porcelain)).toEqual([]);
+  });
+});
+
+describe('vendorsPnpmDeps', () => {
+  it('spots a repo whose node deps are behind a fixed-output hash', () => {
+    expect(
+      vendorsPnpmDeps(`  pnpmDeps = fetchPnpmDeps {\n    hash = "sha256-abc=";\n  };`),
+    ).toBe(true);
+  });
+
+  it('does NOT count a repo that only mentions it in prose', () => {
+    // The warning this drives is itself written above a `pnpmDeps` mention, and
+    // a substring match would make every repo carrying a note about vendoring
+    // look like it vendors. Four repos would have been told to run a nix build
+    // they do not need.
+    expect(vendorsPnpmDeps('# ⚠ Refresh pnpmDeps.hash whenever the lockfile moves')).toBe(false);
+  });
+
+  it('does NOT flag an ordinary package with no vendoring at all', () => {
+    expect(vendorsPnpmDeps('{ buildNpmPackage, ... }: buildNpmPackage { pname = "x"; }')).toBe(false);
   });
 });

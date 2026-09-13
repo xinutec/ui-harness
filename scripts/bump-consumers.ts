@@ -189,6 +189,36 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
   writeFileSync(workspace, moved);
 }
 
+/**
+ * Repos whose node deps are vendored into nix behind a fixed-output hash.
+ *
+ * ⚠ **For these, a bump is FOUR files, not three.** `pnpmDeps.hash` is taken over
+ * `pnpm-lock.yaml`, so moving the lockfile invalidates it and the offline install
+ * dies with `ERR_PNPM_NO_OFFLINE_TARBALL` — which reads as a network fault, names
+ * the harness tarball, and sends you looking at the wrong thing entirely. It cost
+ * a red gate on gamepads during the 2026-09-13 sweep.
+ *
+ * Deliberately a WARNING and not a fix. Refreshing the hash means blanking it,
+ * running `nix build` until it fails, and reading the value back out of the
+ * error — a build per repo, on a machine with nix, for something the maintainer
+ * has to see the output of anyway. This script's whole contract is that it edits
+ * and stops; silently launching nix builds would break that. Saying which repos
+ * need the extra step is the part that was missing.
+ */
+export function vendorsPnpmDeps(nixText: string): boolean {
+  // Comments mentioning the field must not count — this file's own warning above
+  // says `pnpmDeps.hash`, and a repo that only TALKS about vendoring does not
+  // need a refresh. Match the assignment.
+  return /^\s*pnpmDeps\s*=/m.test(nixText);
+}
+
+/** The filesystem half, kept out of the testable one. */
+function vendoredInNix(dir: string): boolean {
+  const nix = join(dir, '..', 'nix', 'package.nix');
+  if (!existsSync(nix)) return false;
+  return vendorsPnpmDeps(readFileSync(nix, 'utf8'));
+}
+
 /** The three files a bump writes, and the only three a cleanup may revert. */
 const PIN_FILES = ['frontend/package.json', 'frontend/pnpm-lock.yaml', 'frontend/pnpm-workspace.yaml'];
 
@@ -328,6 +358,14 @@ function main(): void {
   if (changed === 0) console.log(`${scope} already at ${sha.slice(0, 12)}`);
   else if (apply) console.log(`${changed} repo(s) updated. Run each one's verify, then commit.`);
   else console.log(`${changed} repo(s) would change. Re-run with --apply to do it.`);
+
+  const vendored = targets.filter((entry) => vendoredInNix(entry.dir)).map((entry) => entry.repo);
+  if (changed > 0 && vendored.length > 0) {
+    console.log();
+    console.log(`⚠ ${vendored.join(', ')} vendor node deps into nix: refresh pnpmDeps.hash too,`);
+    console.log('  or the gate fails on ERR_PNPM_NO_OFFLINE_TARBALL naming the harness tarball.');
+    console.log('  Blank the hash, `nix build`, and copy the `got:` value back in.');
+  }
 }
 
 // Only when run as the command. The rewrite is a pure function with a spec
