@@ -57,6 +57,22 @@ export interface OverlapPair {
 }
 
 /**
+ * A text rect plus what findTextOverlaps needs to tell a collision from a
+ * paint-over, kept off the exported shape because it is scaffolding, not a
+ * measurement anyone should read.
+ */
+interface ScoredRect extends TextRect {
+	/** The nearest fixed/sticky ancestor's box, if this text is out of flow. */
+	bar: { top: number; bottom: number; height: number } | null;
+	/** Pixels this text could still be moved up (i.e. scrolled down) by. */
+	canUp: number;
+	/** Pixels it could still be moved down by. */
+	canDown: number;
+	/** Its scrollport's height — a bar taller than this is never scrolled clear. */
+	portH: number;
+}
+
+/**
  * Runs in the browser. Collects every visible text node's per-line glyph
  * rectangles, then returns all pairs that intersect by more than `tol`
  * pixels in BOTH axes (so merely-touching edges and sub-pixel antialiasing
@@ -71,7 +87,43 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 	// drawn on top. That's a false positive; the container scope removes it.
 	const root = rootSel ? document.querySelector(rootSel) : document.body;
 	if (!root) return [];
-	const rects: TextRect[] = [];
+
+	/** The nearest fixed/sticky ancestor's box — non-null means "out of flow". */
+	const barOver = (el: Element): { top: number; bottom: number; height: number } | null => {
+		for (let p: Element | null = el; p; p = p.parentElement) {
+			const pos = getComputedStyle(p).position;
+			if (pos === "fixed" || pos === "sticky") {
+				const b = p.getBoundingClientRect();
+				return { top: b.top, bottom: b.bottom, height: b.height };
+			}
+		}
+		return null;
+	};
+	/** How far this text can still travel, and in what it travels. */
+	const headroom = (el: Element): { canUp: number; canDown: number; portH: number } => {
+		for (let p: Element | null = el; p; p = p.parentElement) {
+			const st = getComputedStyle(p);
+			const e = p as HTMLElement;
+			if (
+				(st.overflowY === "auto" || st.overflowY === "scroll") &&
+				e.scrollHeight > e.clientHeight + 1
+			) {
+				return {
+					canUp: e.scrollHeight - e.clientHeight - e.scrollTop,
+					canDown: e.scrollTop,
+					portH: e.clientHeight,
+				};
+			}
+		}
+		const de = (document.scrollingElement ?? document.documentElement) as HTMLElement;
+		return {
+			canUp: de.scrollHeight - de.clientHeight - de.scrollTop,
+			canDown: de.scrollTop,
+			portH: de.clientHeight,
+		};
+	};
+
+	const rects: ScoredRect[] = [];
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	let nodeIdx = 0;
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -113,9 +165,35 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 				}
 			}
 			if (x2 - x1 < 1 || y2 - y1 < 1) continue;
-			rects.push({ text, x: x1, y: y1, w: x2 - x1, h: y2 - y1, node: nodeIdx });
+			rects.push({
+				text,
+				x: x1,
+				y: y1,
+				w: x2 - x1,
+				h: y2 - y1,
+				node: nodeIdx,
+				bar: barOver(parent),
+				...headroom(parent),
+			});
 		}
 	}
+
+	// Scrolling content passes BEHIND a fixed bar — that is what scrolling is, not a
+	// collision. So when exactly one side of a pair is out of flow, ask whether the
+	// other could still be scrolled out from under it. If it could, the text is one
+	// swipe from readable and this snapshot caught it mid-journey. If it could not,
+	// it is permanently buried (a page missing its nav-clearance) and that IS the
+	// defect — the same scroll test findClippedText uses to tell a transient clip
+	// from a permanent shear. Without this, every scrolling page with a bar trips.
+	const scrollsClear = (flow: ScoredRect, bar: { top: number; bottom: number; height: number }): boolean => {
+		// A full-height side rail is never escaped by scrolling vertically, however
+		// long the page: "the page can move" is not "the text can get out".
+		if (bar.height > flow.portH * 0.9) return false;
+		// Either direction will do — which one depends on whether the bar is above or
+		// below, and at the bar's own edge the two are the same question.
+		return flow.canUp >= flow.y + flow.h - bar.top || flow.canDown >= bar.bottom - flow.y;
+	};
+	const plain = (r: ScoredRect): TextRect => ({ text: r.text, x: r.x, y: r.y, w: r.w, h: r.h, node: r.node });
 
 	const pairs: OverlapPair[] = [];
 	for (const [i, a] of rects.entries()) {
@@ -129,7 +207,12 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 			if (a.node === b.node) continue;
 			const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
 			const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-			if (ox > tol && oy > tol) pairs.push({ a, b, overlap: { w: ox, h: oy } });
+			if (ox <= tol || oy <= tol) continue;
+			// Two bars painted on the same pixels are a real fault; only a
+			// bar-over-content pair gets the scroll test.
+			if (a.bar && !b.bar && scrollsClear(b, a.bar)) continue;
+			if (b.bar && !a.bar && scrollsClear(a, b.bar)) continue;
+			pairs.push({ a: plain(a), b: plain(b), overlap: { w: ox, h: oy } });
 		}
 	}
 	return pairs;

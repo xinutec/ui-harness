@@ -90,6 +90,68 @@ test('a badge sitting on an icon glyph is NOT a collision', async ({ page }) => 
   expect(pairs).toEqual([]);
 });
 
+/**
+ * A fixed bar plus a page long enough to scroll under it. Found live in life's
+ * Today screen: every to-do title wrapping to two lines pushed the last row's
+ * text under the bottom nav, and the oracle read nav labels painted on top as a
+ * text collision. Nothing was wrong with the page — content passing behind a
+ * fixed bar is what scrolling IS.
+ */
+const behindABar = (contentTop: string, pageHeight: string): string => `
+  <div style="height: ${pageHeight}; position: relative; font: 16px sans-serif;">
+    <span style="position: absolute; top: ${contentTop}; left: 8px;">page content</span>
+  </div>
+  <nav style="position: fixed; bottom: 0; left: 0; right: 0; height: 56px; display: flex;
+              align-items: center; background: #fff; font: 16px sans-serif;">Inventory</nav>`;
+
+test('content that can be scrolled out from under a fixed bar is NOT a collision', async ({ page }) => {
+  // At the top of a 3-viewport page, the content sitting under the nav is one
+  // swipe from being readable. Flagging it makes the oracle fire on every
+  // scrollable page in the fleet that has a bar, which is all of them.
+  await page.setContent(phonePage(behindABar('calc(100vh - 30px)', '300vh')));
+  const pairs = await page.evaluate(findTextOverlaps, [null, 1.5] as [string | null, number]);
+  expect(pairs).toEqual([]);
+});
+
+test('content TRAPPED under a fixed bar with nowhere left to scroll IS a collision', async ({ page }) => {
+  // The defect the exemption must not swallow: a page with no nav-clearance, so
+  // its last line is permanently unreadable. Same geometry as above, minus the
+  // scroll room — that one difference is the whole test.
+  await page.setContent(phonePage(behindABar('calc(100vh - 30px)', '100vh')));
+  const pairs = await page.evaluate(findTextOverlaps, [null, 1.5] as [string | null, number]);
+  expect(pairs.length).toBe(1);
+});
+
+test('content under a fixed bar too tall to scroll clear of IS a collision', async ({ page }) => {
+  // A full-height fixed rail is never escaped by scrolling vertically, however
+  // long the page. Scroll room exists, so a naive "can it scroll?" test would
+  // wave this through; the exemption must ask whether scrolling would actually
+  // move the text out from under, not merely whether the page moves.
+  await page.setContent(
+    phonePage(`
+    <div style="height: 300vh; position: relative; font: 16px sans-serif;">
+      <span style="position: absolute; top: 2px; left: 8px;">page content</span>
+    </div>
+    <aside style="position: fixed; inset: 0 auto 0 0; width: 120px; background: #fff;
+                  font: 16px sans-serif;">rail</aside>`),
+  );
+  const pairs = await page.evaluate(findTextOverlaps, [null, 1.5] as [string | null, number]);
+  expect(pairs.length).toBe(1);
+});
+
+test('two fixed bars overlapping EACH OTHER is still a collision', async ({ page }) => {
+  // The exemption keys on exactly one side being out of flow. Two bars stacked on
+  // the same pixels are a real layout fault and no amount of scrolling changes it.
+  await page.setContent(
+    phonePage(`
+    <nav style="position: fixed; bottom: 0; left: 0; height: 56px; display: flex;
+                align-items: center; font: 16px sans-serif;">Inventory</nav>
+    <div style="position: fixed; bottom: 18px; left: 4px; font: 16px sans-serif;">Recipes</div>`),
+  );
+  const pairs = await page.evaluate(findTextOverlaps, [null, 1.5] as [string | null, number]);
+  expect(pairs.length).toBe(1);
+});
+
 test('detects a label sheared at the top of a zero-top-padding scroll box', async ({ page }) => {
   // The Find-on-Waitrose shape: an overflow scroll box with no top padding, whose
   // first bit of text is pushed above the box top (a floating outline label sits
