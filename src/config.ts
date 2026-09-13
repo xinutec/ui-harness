@@ -189,6 +189,22 @@ export function phoneConfig(
 		use: {
 			baseURL: origin,
 			screenshot: "only-on-failure",
+			// ⚠ **A SERVICE WORKER SILENTLY DEFEATS `page.route`.** Playwright does
+			// not intercept requests a worker makes, so the moment an app registers
+			// one, every test that mocks an API response starts seeing the real
+			// network instead — and the failure is a timeout waiting for content
+			// that never arrives, which reads as a broken app rather than a broken
+			// mock. utterance hit it the day it adopted one (dev-lint#1384): 42
+			// green runs over 18 days, then a timeout on the first run with a
+			// worker.
+			//
+			// Blocked rather than allowed because of what these tests ARE: layout
+			// at phone width, asserting about painted pixels given known data. A
+			// worker contributes caching and request interception, neither of which
+			// is layout, and both of which are flakiness. The worker's own
+			// behaviour is unit-tested against a fake in `sw-updates`, and verified
+			// end to end by hand — see #1384's procedure.
+			serviceWorkers: "block",
 		},
 		// Pixel 9 ≈ the Pixel 7 preset: 412 CSS px wide, mobile UA, touch. The
 		// viewport MUST live in the PROJECT `use`, not the global one — a device
