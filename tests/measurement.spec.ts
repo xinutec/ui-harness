@@ -6,6 +6,7 @@ import {
   findClippedText,
   findHorizontalOverflow,
   findOccludedControls,
+  findStarvedText,
   findTextOverlaps,
   swipeUp,
 } from '../src/ui-harness';
@@ -509,4 +510,66 @@ test('does NOT flag an icon that spills instead of clipping', async ({ page }) =
     </div>`),
   );
   expect(await page.evaluate(findClippedIcons, [null, 1] as [string | null, number])).toEqual([]);
+});
+
+/**
+ * The fifth failure class: text ellipsized down to almost nothing. Every case
+ * below is from life's Inventory row, where three trailing buttons took the
+ * width out of the title and "Milk (semi-skimmed)" rendered as "Milk (…" on a
+ * green gate.
+ */
+const starve = (titleWidth: string, text: string): string => `
+  <div style="display: flex; width: 320px; font: 16px sans-serif;">
+    <div style="width: ${titleWidth}; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap;">${text}</div>
+    <span style="flex: none;">⋮</span>
+  </div>`;
+
+test('detects a title ellipsized down to a fraction of itself', async ({ page }) => {
+  await page.setContent(phonePage(starve('60px', 'Milk (semi-skimmed) from the corner shop')));
+  const found = await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number]);
+  expect(found.length).toBe(1);
+  expect(first(found).visible).toBeLessThan(0.3);
+});
+
+test('does NOT flag a title that loses only its tail', async ({ page }) => {
+  // Ellipsis is usually the feature working. Losing a little is not a fault, and
+  // a rule that says otherwise is a rule every dense list has to waive.
+  await page.setContent(phonePage(starve('260px', 'Milk (semi-skimmed) from the shop')));
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+});
+
+test('does NOT flag text that fits, however nowrap it is', async ({ page }) => {
+  await page.setContent(phonePage(starve('300px', 'Short name')));
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+});
+
+test('does NOT flag a WRAPPING element, which hides nothing horizontally', async ({ page }) => {
+  await page.setContent(
+    phonePage(`
+    <div style="width: 60px; overflow: hidden; font: 16px sans-serif;">
+      Milk (semi-skimmed) from the corner shop
+    </div>`),
+  );
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+});
+
+test('does NOT flag a short label, where the ratio is violent and the loss is not', async ({ page }) => {
+  await page.setContent(phonePage(starve('12px', 'Qty')));
+  expect(await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number])).toEqual([]);
+});
+
+test('names the element that truncates, not an ancestor that merely contains it', async ({ page }) => {
+  // A nowrap ancestor around a nowrap child reported the outer one too, which
+  // sends the reader to the wrong element to fix.
+  await page.setContent(
+    phonePage(`
+    <div style="width: 60px; overflow: hidden; white-space: nowrap; font: 16px sans-serif;">
+      <span class="title" style="display: block; overflow: hidden; text-overflow: ellipsis;
+                                 white-space: nowrap;">Milk (semi-skimmed) from the shop</span>
+    </div>`),
+  );
+  const found = await page.evaluate(findStarvedText, [null, 0.5, 8] as [string | null, number, number]);
+  expect(found.length).toBe(1);
+  expect(first(found).by).toBe('span.title');
 });

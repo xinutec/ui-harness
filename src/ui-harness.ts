@@ -970,3 +970,112 @@ export async function expectCanvasLegible(
 			`  light-dark(...), canvas cannot parse it, and the assignment is silently ignored.`,
 	);
 }
+
+/** A line of text ellipsized down to a fraction of what it says. */
+export interface StarvedText {
+	/** What is actually painted, ellipsis included. */
+	shown: string;
+	/** Fraction of the laid-out width that is visible, 0–1. */
+	visible: number;
+	/** Painted width and the width the text actually wants. */
+	px: { shown: number; wanted: number };
+	/** The element doing the truncating (tag + leading classes). */
+	by: string;
+}
+
+/**
+ * Runs in the browser. The failure class none of the four above can see:
+ * horizontally ellipsized text starved down to almost nothing. It is not an
+ * overlap, it is not overflow (the row FITS — that is the point), and
+ * findClippedText measures only the top and bottom edges.
+ *
+ * Found in life's Inventory, where three trailing icon buttons took the width out
+ * of the title and item names rendered as "Milk (…", "Chick…", "Leveti…" — five
+ * of nineteen characters, on a gate that was green. Nobody found it by reading
+ * the source; somebody found it by opening a screenshot.
+ *
+ * ⚠ **Ellipsis is usually CORRECT**, which is why this is a ratio and not a ban.
+ * A long product name losing its tail is the feature working. A name losing 70%
+ * of itself is a layout fault wearing the feature's clothes. `minVisible` is
+ * where one becomes the other; default 0.5, deliberately permissive.
+ *
+ * `args` is [rootSel, minVisible, minChars]. `minChars` skips short strings: a
+ * two-character label clipped to one is noise, and the ratio is violent on small
+ * numbers.
+ */
+export function findStarvedText(args: [string | null, number, number]): StarvedText[] {
+	const [rootSel, minVisible, minChars] = args;
+	const root = rootSel ? document.querySelector(rootSel) : document.body;
+	if (!root) return [];
+	const describe = (el: Element): string => {
+		const cls =
+			typeof el.className === "string" && el.className.trim()
+				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
+				: "";
+		return el.tagName.toLowerCase() + cls;
+	};
+	const out: StarvedText[] = [];
+	for (const el of Array.from(root.querySelectorAll("*"))) {
+		const st = getComputedStyle(el);
+		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		// Only elements that truncate: ellipsis (or a hard clip) on a single line.
+		// A wrapping element does not hide anything horizontally.
+		if (st.whiteSpace !== "nowrap" && st.whiteSpace !== "pre") continue;
+		if (st.overflowX !== "hidden" && st.overflowX !== "clip") continue;
+		const text = (el.textContent ?? "").trim();
+		if (text.length < minChars) continue;
+		// Own text only. A nowrap ancestor wrapping a nowrap child would otherwise
+		// be reported twice, and the outer report names the wrong element.
+		const ownText = Array.from(el.childNodes).some(
+			(n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim() !== "",
+		);
+		if (!ownText) continue;
+		const e = el as HTMLElement;
+		const wanted = e.scrollWidth;
+		const shown = e.clientWidth;
+		if (wanted <= shown + 1 || wanted === 0) continue;
+		const visible = shown / wanted;
+		if (visible >= minVisible) continue;
+		out.push({
+			shown: text.slice(0, 40),
+			visible,
+			px: { shown, wanted },
+			by: describe(el),
+		});
+	}
+	return out;
+}
+
+/**
+ * Assert no text is ellipsized below `minVisible` of what it says.
+ *
+ * ⚠ Opt-in, and not part of any app's gate by default: the right threshold is a
+ * per-screen judgement, and a dense list that truncates on purpose is not broken.
+ * Point it at a container you have decided should be readable in full.
+ */
+export async function expectNoStarvedText(
+	page: Page,
+	testInfo: TestInfo,
+	rootSel: string | null = null,
+	minVisible = 0.5,
+	minChars = 8,
+): Promise<void> {
+	await leaveSnapshot(page, testInfo);
+	const starved = await page.evaluate(findStarvedText, [rootSel, minVisible, minChars] as [
+		string | null,
+		number,
+		number,
+	]);
+	if (starved.length === 0) return;
+	const detail = starved
+		.map(
+			(s) =>
+				`  "${s.shown}" — only ${(s.visible * 100).toFixed(0)}% shown ` +
+				`(${s.px.shown}px of ${s.px.wanted}px) in ${s.by}`,
+		)
+		.join("\n");
+	throw new LayoutError(
+		`Text ellipsized below ${(minVisible * 100).toFixed(0)}% of itself (${starved.length}):\n${detail}\n` +
+			`  Usually something beside it is taking the width — a trailing icon, a pill, an avatar.`,
+	);
+}
