@@ -212,15 +212,12 @@ export function phoneConfig(
 		// global. deviceScaleFactor is forced to 1 so CSS-pixel geometry (what the
 		// layout checks measure) is DPR-invariant and goldens stay small.
 		//
-		// ⚠ Locale and zone are pinned for the same reason the viewport is, and
-		// were not. Measured before this: `Intl.DateTimeFormat().resolvedOptions()`
-		// returned `en-US` — Chromium's built-in default, not the Mac's `en_GB` —
-		// while the zone came from the host, so it read Europe/London here and
-		// whatever CI runs in elsewhere. Thirteen apps were measured in a locale
-		// none of their users have, and life rendered `8/20/2026` beside `£8.00/KG`.
-		// A date is a WIDTH: "20 August 2026" and "August 20, 2026" wrap
-		// differently, so an unpinned locale can pass a row that is sheared for the
-		// people who actually read it. An app elsewhere overrides both.
+		// ⚠ Locale and zone are pinned for the same reason the viewport is.
+		// Chromium defaults to `en-US` whatever the host says, and takes the zone
+		// FROM the host — so unpinned, every app is measured in a locale none of
+		// its users have, on whichever clock the runner keeps. A date is a WIDTH:
+		// "20 August 2026" and "August 20, 2026" wrap differently, so this can
+		// pass a row that is sheared for the people who read it. Apps override.
 		projects: [
 			{
 				name: "chromium",

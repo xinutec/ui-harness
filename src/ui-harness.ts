@@ -984,31 +984,22 @@ export interface StarvedText {
 }
 
 /**
- * Runs in the browser. The failure class none of the four above can see:
- * horizontally ellipsized text starved down to almost nothing. It is not an
- * overlap, it is not overflow (the row FITS — that is the point), and
- * findClippedText measures only the top and bottom edges.
+ * Runs in the browser. The failure class the other four cannot see: horizontally
+ * ellipsized text starved down to almost nothing. Not an overlap, not overflow
+ * (the row FITS — that is the point), and findClippedText reads only the top and
+ * bottom edges. life shipped item names as "Milk (…" on a green gate.
  *
- * Found in life's Inventory, where three trailing icon buttons took the width out
- * of the title and item names rendered as "Milk (…", "Chick…", "Leveti…" — five
- * of nineteen characters, on a gate that was green. Nobody found it by reading
- * the source; somebody found it by opening a screenshot.
- *
- * ⚠ **Ellipsis is usually CORRECT**, which is why this is a ratio and not a ban.
- * A long product name losing its tail is the feature working. A name losing 70%
- * of itself is a layout fault wearing the feature's clothes. `minVisible` is
- * where one becomes the other; default 0.5, deliberately permissive.
+ * ⚠ Ellipsis is usually CORRECT, so this is a ratio, not a ban. A name losing its
+ * tail is the feature working; one losing 70% of itself is a layout fault wearing
+ * the feature's clothes. `minVisible` is where one becomes the other.
  *
  * `args` is [rootSel, minVisible, minChars, allow]. `minChars` skips short
- * strings: a two-character label clipped to one is noise, and the ratio is
- * violent on small numbers.
+ * strings, where the ratio is violent and the loss is not.
  *
- * ⚠ `allow` exempts BY SELECTOR, the way findHorizontalOverflow's does, because
- * some truncation is the design and not a fault. life's item rows deliberately
- * starve their fact line so the expiry beside it survives at full width — it
- * measures 31% and that is the intended trade. Exempting it by name keeps the
- * check on everything else in the row, where a title at 31% IS the bug this
- * exists for. Switching the whole page off would lose both.
+ * ⚠ `allow` exempts BY SELECTOR, as findHorizontalOverflow's does, because some
+ * truncation IS the design — life's rows starve their fact line so the expiry
+ * keeps full width. Exempting it by name keeps the check on the title beside it,
+ * which is the bug this exists for; switching the page off loses both.
  */
 export function findStarvedText(args: [string | null, number, number, string[]]): StarvedText[] {
 	const [rootSel, minVisible, minChars, allow] = args;

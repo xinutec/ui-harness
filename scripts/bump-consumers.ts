@@ -194,16 +194,12 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
  *
  * ⚠ **For these, a bump is FOUR files, not three.** `pnpmDeps.hash` is taken over
  * `pnpm-lock.yaml`, so moving the lockfile invalidates it and the offline install
- * dies with `ERR_PNPM_NO_OFFLINE_TARBALL` — which reads as a network fault, names
- * the harness tarball, and sends you looking at the wrong thing entirely. It cost
- * a red gate on gamepads during the 2026-09-13 sweep.
+ * dies with `ERR_PNPM_NO_OFFLINE_TARBALL` — which names the harness tarball and
+ * reads as a network fault.
  *
- * Deliberately a WARNING and not a fix. Refreshing the hash means blanking it,
- * running `nix build` until it fails, and reading the value back out of the
- * error — a build per repo, on a machine with nix, for something the maintainer
- * has to see the output of anyway. This script's whole contract is that it edits
- * and stops; silently launching nix builds would break that. Saying which repos
- * need the extra step is the part that was missing.
+ * A warning, not a fix: refreshing means blanking the hash and reading the value
+ * out of a failed `nix build`, which is a build per repo whose output someone has
+ * to see anyway. This script edits and stops.
  */
 export function vendorsPnpmDeps(nixText: string): boolean {
   // Comments mentioning the field must not count — this file's own warning above
