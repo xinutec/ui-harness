@@ -10,6 +10,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -19,6 +21,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.edit
@@ -109,6 +112,56 @@ abstract class WebShellActivity : ComponentActivity() {
             }
         }
 
+    /**
+     * Escape hatch from a page that hangs the renderer.
+     *
+     * ⚠ **[Restore] CANNOT COVER THIS CASE.** It refuses pages known in advance
+     * to be transient; health's map tab on 2026-09-14 was a perfectly ordinary
+     * page that spun Android WebView's synchronous compositor at a full core and
+     * killed JavaScript. Since [restorePoint] reopens the last page on every
+     * cold launch, the app reloaded it forever — force-stopping did not help and
+     * reinstalling would not have. The rule is in [Liveness]; this is the wiring.
+     */
+    private val liveness = Liveness()
+    private val ticker = Handler(Looper.getMainLooper())
+    private var probeId = 0L
+
+    private val tick =
+        object : Runnable {
+            override fun run() {
+                // ⚠ The callback runs on the APP's main thread, which is alive
+                // even when the renderer is not — that asymmetry is the whole
+                // detector. A wedged renderer simply never answers.
+                val mine = ++probeId
+                web.postVisualStateCallback(
+                    mine,
+                    object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) = liveness.onAnswered()
+                    },
+                )
+                if (liveness.onResumedElapsed(Liveness.PROBE_INTERVAL_MS)) onRendererWedged()
+                ticker.postDelayed(this, Liveness.PROBE_INTERVAL_MS)
+            }
+        }
+
+    /**
+     * The renderer has stopped answering. Drop the restore point so the user's
+     * next launch is not the same hanging page.
+     *
+     * ⚠ **IT DOES NOT NAVIGATE.** Reloading a safe page would be a nicer rescue
+     * and would also yank a user whose renderer was merely slow. Discarding the
+     * restore point is the smaller act and the one that actually unbricks: it
+     * makes force-stop-and-reopen — what a person does anyway — work again.
+     */
+    private fun onRendererWedged() {
+        Log.w(
+            TAG,
+            "renderer unresponsive for ${Liveness.WEDGED_AFTER_MS} ms — dropping the restore point",
+        )
+        prefs.edit { remove(KEY_LAST_URL) }
+        Toast.makeText(this, "Page stopped responding — reopen the app", Toast.LENGTH_LONG).show()
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -197,13 +250,26 @@ abstract class WebShellActivity : ComponentActivity() {
      */
     override fun onPause() {
         CookieManager.getInstance().flush()
+        // ⚠ Stop counting: a backgrounded WebView is not expected to paint, and
+        // treating that as a hang would discard the restore point of every app
+        // the user simply left.
+        ticker.removeCallbacks(tick)
+        liveness.onPaused()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        liveness.onAnswered()
+        ticker.removeCallbacks(tick)
+        ticker.postDelayed(tick, Liveness.PROBE_INTERVAL_MS)
     }
 
     // `configChanges` keeps the Activity across rotation, so this only fires on a
     // real finish — release the WebView instead of leaking it. A subclass with its
     // own views to release overrides this and calls super LAST.
     override fun onDestroy() {
+        ticker.removeCallbacks(tick)
         root.removeView(web)
         web.destroy()
         super.onDestroy()
