@@ -6,10 +6,9 @@
 # ride on these functions; a red run here is a real regression in all of them.
 #
 # The Android half — ktlint over android/. Eight WebView wrappers ride on the
-# shell, and until 2026-08-02 nothing in CI looked at its Kotlin at all: the
-# gate existed only in the local gate, which CI never called. The shell's
-# Gradle unit tests and the life consumer APK still need the unfree SDK and stay
-# local; ktlint does not, so it runs here.
+# shell, so its Kotlin needs a check CI actually calls rather than one that lives
+# only in the local gate. The shell's Gradle unit tests and the life consumer APK
+# need the unfree SDK and stay local; ktlint does not, so it runs here.
 name: ci
 on:
   push:
@@ -44,9 +43,8 @@ jobs:
       # pixel still in the right place.
       - run: pnpm run test:unit
       # src/ + tests/ + scripts/, under the root tsconfig.json. The build above
-      # covers src/ only. scripts/ is real code that used to be shell, where a
-      # silent substitution bug in bump-consumers rewrote a lockfile without its
-      # manifest.
+      # covers src/ only. scripts/ is real code — a silent substitution bug in
+      # bump-consumers is enough to rewrite a lockfile without its manifest.
       - run: pnpm run typecheck
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
