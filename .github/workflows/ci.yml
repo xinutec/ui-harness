@@ -34,7 +34,6 @@ jobs:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      # pnpm's ci: install exactly the lockfile, or fail.
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
       - run: pnpm run build
