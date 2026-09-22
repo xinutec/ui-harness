@@ -4,7 +4,7 @@
 # build, and one Gradle invocation cannot load two versions of the Android plugin.
 [versions]
 agp = "8.13.0"
-kotlin = "2.4.0"
+kotlin = "2.4.20"
 coreKtx = "1.16.0"
 activity = "1.13.0"
 junit = "4.13.2"
