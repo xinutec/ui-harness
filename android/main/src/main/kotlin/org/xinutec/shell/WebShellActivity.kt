@@ -162,7 +162,7 @@ abstract class WebShellActivity : ComponentActivity() {
         Toast.makeText(this, "Page stopped responding — reopen the app", Toast.LENGTH_LONG).show()
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled") // the shell runs the app's own bundle
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyWebDebugging()
