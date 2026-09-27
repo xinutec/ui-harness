@@ -32,8 +32,10 @@ into history the same way, from here. The console in memview is where it was
 written.
 
 - **`<ui-scaffold title="…" [menu]="…">`**, once, above the router. The root
-  screen gets a leading `menu` (when the app passes one) and the app's name; a
-  screen whose route declares up gets `arrow_back` and its own name. What the
+  screen and any other screen without up (a top-level destination the menu
+  reaches) get a leading `menu` (when the app passes one) and the screen's own
+  name, else the app's; a screen whose route declares up gets `arrow_back` and
+  its own name. What the
   element holds is drawn at the end on every screen; a page adds its own
   actions after it with `<ng-template scaffoldActions>`.
 - **Up is declared on the route**, never set by a page:

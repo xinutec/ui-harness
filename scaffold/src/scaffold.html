@@ -7,7 +7,8 @@
         <mat-icon>menu</mat-icon>
       </button>
     }
-    <h1>{{ title() }}</h1>
+    <!-- A top-level screen beside the root may name itself; the root is the app. -->
+    <h1 [class.provisional]="place.title()?.provisional">{{ place.title()?.text ?? title() }}</h1>
   } @else {
     <!-- A button, not an `a`: the rule that centres a glyph in its circle is
          `button[matIconButton]`, an element selector. -->

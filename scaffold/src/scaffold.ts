@@ -11,8 +11,9 @@ import { Place } from './place';
 /**
  * The top bar every app draws, one for the whole app, above the router.
  *
- * On the root screen: a leading `menu` when the app has one, then the app's
- * name. On any screen whose route declares up: a leading `arrow_back` to its
+ * On a screen with no up — the root, or a top-level screen the menu reaches —
+ * a leading `menu` when the app has one, then the screen's name, or the app's
+ * when the screen gives none. On any screen whose route declares up: a leading `arrow_back` to its
  * parent, then the screen's name. Then what the element holds, for the whole
  * app (a keep-awake toggle), then the screen's own actions ([ScaffoldActions]).
  */
@@ -26,7 +27,7 @@ import { Place } from './place';
 export class Scaffold {
   protected readonly place = inject(Place);
 
-  /** The app's name, on the root screen. */
+  /** The app's name, on a screen with no up that does not name itself. */
   readonly title = input.required<string>();
   /** What the root screen's leading `menu` opens. No menu, no button. */
   readonly menu = input<MatMenuPanel>();
