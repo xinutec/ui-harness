@@ -1081,3 +1081,48 @@ export async function expectNoStarvedText(
 			`  Usually something beside it is taking the width — a trailing icon, a pill, an avatar.`,
 	);
 }
+
+/*
+ * Checks an app's phone suite runs against its own `@xinutec/ui-scaffold`
+ * wiring, which the scaffold's tests cannot see: that a screen whose route
+ * declares up leads with the arrow, and that back closes an overlay rather than
+ * leaving the screen under it.
+ */
+
+/** The overlays Material draws: a bottom sheet or a dialog. */
+const OVERLAY = "mat-bottom-sheet-container, mat-dialog-container";
+
+/** Call on a screen whose route declares up: the bar's leading icon is `arrow_back`. */
+export async function expectUpInTheBar(page: Page): Promise<void> {
+	await page.locator("ui-scaffold mat-toolbar").waitFor();
+	const leading = await page.evaluate(
+		() =>
+			document.querySelector("ui-scaffold mat-toolbar > button:first-child mat-icon")?.textContent?.trim() ??
+			null,
+	);
+	if (leading !== "arrow_back") {
+		throw new LayoutError(
+			`the bar leads with ${leading === null ? "no icon button" : `"${leading}"`}, not arrow_back — does the route declare up?`,
+		);
+	}
+}
+
+/**
+ * `open` opens a sheet or a dialog; back must close it and leave the URL as it
+ * was. An overlay opened without `Sheets`/`Dialogs` has no history entry of its
+ * own, so back leaves the screen and takes the overlay with it.
+ */
+export async function expectBackClosesOverlay(page: Page, open: () => Promise<void>): Promise<void> {
+	const before = page.url();
+	await open();
+	await page.locator(OVERLAY).first().waitFor();
+	await page.goBack();
+	const closed = await page
+		.waitForFunction((sel) => document.querySelector(sel) === null, OVERLAY, { timeout: 5_000 })
+		.then(() => true)
+		.catch(() => false);
+	if (page.url() !== before) {
+		throw new LayoutError(`back left the screen: ${before} became ${page.url()} — was the overlay opened without Sheets or Dialogs?`);
+	}
+	if (!closed) throw new LayoutError("back did not close the overlay");
+}
