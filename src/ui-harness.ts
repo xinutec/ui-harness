@@ -1138,3 +1138,81 @@ export async function expectBackClosesOverlay(page: Page, open: () => Promise<vo
 	}
 	if (!closed) throw new LayoutError("back did not close the overlay");
 }
+
+/*
+ * A deploy that removed the bundle an old index names. A service worker can serve
+ * an index from a version whose `main-*.js` the server no longer holds, and then
+ * Angular never starts: the screen stays blank, and the app's own recovery
+ * (`sw-updates`) cannot run, because it lives in the bundle that is missing. So
+ * the recovery is inline in each app's `index.html`, in `<head>`, before any
+ * bundle, and this is its text. `expectRecoversFromMissingBundle` is the check.
+ */
+
+/**
+ * The inline script every service-worker app carries in `index.html`'s `<head>`.
+ *
+ * When `main-*.js` fails to load it unregisters the service worker, deletes
+ * ngsw's caches (which hold its version state, so a new registration could bring
+ * the broken version back) and reloads. At most once a minute, so a bundle that
+ * is really gone cannot loop the page; if `sessionStorage` cannot be used it does
+ * nothing rather than risk a loop.
+ */
+export const MISSING_BUNDLE_RECOVERY = `<script>
+  // A deploy removed the bundle this page names: see @xinutec/ui-harness,
+  // MISSING_BUNDLE_RECOVERY. Drop the service worker and its caches, and reload.
+  addEventListener('error', function (e) {
+    var s = e.target;
+    if (!(s instanceof HTMLScriptElement) || !/\\/main-[^/]*\\.js$/.test(s.src)) return;
+    try {
+      var last = Number(sessionStorage.getItem('missing-bundle-reload')) || 0;
+      if (Date.now() - last < 60000) return;
+      sessionStorage.setItem('missing-bundle-reload', String(Date.now()));
+    } catch (_) {
+      return;
+    }
+    var sw = navigator.serviceWorker;
+    Promise.all([
+      sw && sw.getRegistrations().then(function (all) {
+        return Promise.all(all.map(function (r) { return r.unregister(); }));
+      }),
+      window.caches && caches.keys().then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return k.indexOf('ngsw:') === 0; })
+          .map(function (k) { return caches.delete(k); }));
+      }),
+    ]).finally(function () { location.reload(); });
+  }, true);
+</script>`;
+
+/**
+ * The app at `url` starts even when its `main-*.js` fails once, which is what a
+ * page carrying {@link MISSING_BUNDLE_RECOVERY} does and a page without it does
+ * not: the first load's bundle is answered with a 404, and the app must reload
+ * and draw `ready` (a selector only a started app renders).
+ */
+export async function expectRecoversFromMissingBundle(page: Page, url: string, ready: string): Promise<void> {
+	let asked = 0;
+	await page.route(/\/main-[^/]*\.js(\?.*)?$/, (route) => {
+		asked += 1;
+		return asked === 1 ? route.fulfill({ status: 404, body: "" }) : route.fallback();
+	});
+	await page.goto(url);
+	const started = await page
+		.locator(ready)
+		.first()
+		.waitFor({ timeout: 15_000 })
+		.then(() => true)
+		.catch(() => false);
+	await page.unroute(/\/main-[^/]*\.js(\?.*)?$/);
+	// Otherwise it passed without testing anything: a service worker already in
+	// control answers the bundle from its cache, where no route can see it.
+	if (started && asked < 2) {
+		throw new LayoutError(
+			`main-*.js was requested ${asked} time(s), not refused and then fetched again — was it served by a service worker already in control?`,
+		);
+	}
+	if (!started) {
+		throw new LayoutError(
+			`the app never started after its bundle failed to load once (${asked} request(s) for main-*.js) — is MISSING_BUNDLE_RECOVERY in index.html's <head>?`,
+		);
+	}
+}

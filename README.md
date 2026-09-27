@@ -251,6 +251,14 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 - `expectBackClosesOverlay(page, open)` — `open` opens a sheet or dialog; back
   closes it and leaves the URL alone. An overlay opened past `Sheets`/`Dialogs`
   has no history entry, so back leaves the screen and the check names that.
+- `MISSING_BUNDLE_RECOVERY` and `expectRecoversFromMissingBundle(page, url,
+  ready)` — a service worker can serve an index naming a `main-*.js` a later
+  deploy removed, and the app never starts; its own recovery is inside that
+  bundle. Every service-worker app pastes `MISSING_BUNDLE_RECOVERY` into
+  `index.html`'s `<head>`, before any bundle: when the bundle fails to load it
+  unregisters the worker, deletes its `ngsw:` caches and reloads, at most once a
+  minute. The check refuses the bundle once and expects `ready` after the
+  reload; it fails rather than passes if it never saw the bundle requested.
 - `swipeUp(page, opts?)` — a real CDP touch flick, not a `scrollTop` shortcut.
 - `expectReachableByScroll(page, locator, scrollerSel)` — swipe until the target
   is on-screen; fails if a nested-scroller fight keeps it unreachable.
