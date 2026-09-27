@@ -45,6 +45,17 @@ test('a detail screen leading with the arrow passes', async ({ page }) => {
   await expectUpInTheBar(page);
 });
 
+// After a client-side navigation the URL changes before the bar redraws, so a
+// check that read the icon once saw the old screen's `menu` (#1827).
+test('a bar that redraws after the navigation is waited for', async ({ page }) => {
+  await serve(
+    page,
+    `${bar('menu')}<script>setTimeout(() => { document.querySelector('mat-icon').textContent = 'arrow_back'; }, 300);</script>`,
+  );
+  await page.goto(`${ORIGIN}/s/1`);
+  await expectUpInTheBar(page);
+});
+
 test('a detail screen that kept the root menu is named', async ({ page }) => {
   await serve(page, bar('menu'));
   await page.goto(`${ORIGIN}/s/1`);
