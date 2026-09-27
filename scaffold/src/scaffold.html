@@ -21,9 +21,15 @@
   } @else {
     <!-- A button, not an `a`: the rule that centres a glyph in its circle is
          `button[matIconButton]`, an element selector. -->
-    <button matIconButton [routerLink]="up.path" [queryParams]="up.query" [attr.aria-label]="up.label">
-      <mat-icon>arrow_back</mat-icon>
-    </button>
+    @if (up.opener && place.opened()) {
+      <button matIconButton (click)="location.back()" [attr.aria-label]="up.label">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    } @else {
+      <button matIconButton [routerLink]="up.path" [queryParams]="up.query" [attr.aria-label]="up.label">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    }
     <h1 [class.provisional]="place.title()?.provisional">{{ place.title()?.text }}</h1>
   }
   <span class="spacer"></span>

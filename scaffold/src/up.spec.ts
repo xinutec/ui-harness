@@ -4,7 +4,7 @@ import { declaredUp, resolveUp } from './up';
 
 describe('resolveUp', () => {
   it('is the path as declared when it names no parameter', () => {
-    expect(resolveUp('/', {}, {})).toEqual({ path: '/', query: {}, label: 'back' });
+    expect(resolveUp('/', {}, {})).toEqual({ path: '/', query: {}, label: 'back', opener: false });
   });
 
   it("fills a :name from the route's parameters, escaped", () => {
@@ -16,11 +16,16 @@ describe('resolveUp', () => {
       task: 't1',
       scroll: '40',
     });
-    expect(up).toEqual({ path: '/s/x/w/r', query: { task: 't1' }, label: 'back' });
+    expect(up).toEqual({ path: '/s/x/w/r', query: { task: 't1' }, label: 'back', opener: false });
   });
 
   it('says what the declaration names it', () => {
     expect(resolveUp({ path: '/', label: 'all sessions' }, {}, {}).label).toBe('all sessions');
+  });
+
+  it('returns to the opener only when the route says so', () => {
+    expect(resolveUp({ path: '/inventory', opener: true }, {}, {}).opener).toBe(true);
+    expect(resolveUp('/inventory', {}, {}).opener).toBe(false);
   });
 
   it('refuses a parent the route cannot fill', () => {

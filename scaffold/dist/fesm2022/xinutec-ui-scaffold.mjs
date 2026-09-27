@@ -5,7 +5,7 @@ import { MatBottomSheet } from "@angular/material/bottom-sheet";
 import { MatDialog } from "@angular/material/dialog";
 import { NavigationEnd, Router, RouterLink } from "@angular/router";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { filter, map } from "rxjs";
+import { filter, map, scan } from "rxjs";
 import * as i2 from "@angular/material/badge";
 import { MatBadgeModule } from "@angular/material/badge";
 import * as i3 from "@angular/material/button";
@@ -111,7 +111,7 @@ function declaredUp(data) {
 	return up;
 }
 function resolveUp(declared, params, query) {
-	const { path, keep = [], label = "back" } = typeof declared === "string" ? { path: declared } : declared;
+	const { path, keep = [], label = "back", opener = false } = typeof declared === "string" ? { path: declared } : declared;
 	const filled = path.split("/").map((segment) => {
 		if (!segment.startsWith(":")) return segment;
 		const value = params[segment.slice(1)];
@@ -126,12 +126,14 @@ function resolveUp(declared, params, query) {
 	return {
 		path: filled,
 		query: carried,
-		label
+		label,
+		opener
 	};
 }
 var Place = class Place {
 	router = inject(Router);
 	up = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), map(() => upOf(this.router.routerState.snapshot.root))), { initialValue: upOf(this.router.routerState.snapshot.root) });
+	opened = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), scan((shown) => shown + 1, this.router.navigated ? 1 : 0), map((shown) => shown > 1)), { initialValue: false });
 	title = signal(void 0, ...ngDevMode ? [{ debugName: "title" }] : /* istanbul ignore next */ []);
 	actions = signal(void 0, ...ngDevMode ? [{ debugName: "actions" }] : /* istanbul ignore next */ []);
 	static ɵfac = i0.ɵɵngDeclareFactory({
@@ -221,6 +223,7 @@ i0.ɵɵngDeclareClassMetadata({
 });
 var Scaffold = class Scaffold {
 	place = inject(Place);
+	location = inject(Location);
 	title = input.required(...ngDevMode ? [{ debugName: "title" }] : /* istanbul ignore next */ []);
 	menu = input(...ngDevMode ? [void 0, { debugName: "menu" }] : /* istanbul ignore next */ []);
 	menuBadge = input(0, ...ngDevMode ? [{ debugName: "menuBadge" }] : /* istanbul ignore next */ []);
@@ -270,7 +273,7 @@ var Scaffold = class Scaffold {
 			}
 		},
 		ngImport: i0,
-		template: "<mat-toolbar>\n  @let up = place.up();\n  <!-- The root first: its leading slot is the navigation menu. -->\n  @if (!up) {\n    @if (menu(); as menu) {\n      <!-- A count of what needs attention behind the menu, hidden at 0; the label\n           says it in words, since a badge is only seen. -->\n      <button\n        matIconButton\n        [matMenuTriggerFor]=\"menu\"\n        [attr.aria-label]=\"menuLabel()\"\n        [matBadge]=\"menuBadge()\"\n        [matBadgeHidden]=\"!menuBadge()\"\n        matBadgeSize=\"small\"\n      >\n        <mat-icon>menu</mat-icon>\n      </button>\n    }\n    <!-- A top-level screen beside the root may name itself; the root is the app. -->\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text ?? title() }}</h1>\n  } @else {\n    <!-- A button, not an `a`: the rule that centres a glyph in its circle is\n         `button[matIconButton]`, an element selector. -->\n    <button matIconButton [routerLink]=\"up.path\" [queryParams]=\"up.query\" [attr.aria-label]=\"up.label\">\n      <mat-icon>arrow_back</mat-icon>\n    </button>\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text }}</h1>\n  }\n  <span class=\"spacer\"></span>\n  <ng-content />\n  @if (place.actions(); as actions) {\n    <ng-container [ngTemplateOutlet]=\"actions\" />\n  }\n</mat-toolbar>\n",
+		template: "<mat-toolbar>\n  @let up = place.up();\n  <!-- The root first: its leading slot is the navigation menu. -->\n  @if (!up) {\n    @if (menu(); as menu) {\n      <!-- A count of what needs attention behind the menu, hidden at 0; the label\n           says it in words, since a badge is only seen. -->\n      <button\n        matIconButton\n        [matMenuTriggerFor]=\"menu\"\n        [attr.aria-label]=\"menuLabel()\"\n        [matBadge]=\"menuBadge()\"\n        [matBadgeHidden]=\"!menuBadge()\"\n        matBadgeSize=\"small\"\n      >\n        <mat-icon>menu</mat-icon>\n      </button>\n    }\n    <!-- A top-level screen beside the root may name itself; the root is the app. -->\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text ?? title() }}</h1>\n  } @else {\n    <!-- A button, not an `a`: the rule that centres a glyph in its circle is\n         `button[matIconButton]`, an element selector. -->\n    @if (up.opener && place.opened()) {\n      <button matIconButton (click)=\"location.back()\" [attr.aria-label]=\"up.label\">\n        <mat-icon>arrow_back</mat-icon>\n      </button>\n    } @else {\n      <button matIconButton [routerLink]=\"up.path\" [queryParams]=\"up.query\" [attr.aria-label]=\"up.label\">\n        <mat-icon>arrow_back</mat-icon>\n      </button>\n    }\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text }}</h1>\n  }\n  <span class=\"spacer\"></span>\n  <ng-content />\n  @if (place.actions(); as actions) {\n    <ng-container [ngTemplateOutlet]=\"actions\" />\n  }\n</mat-toolbar>\n",
 		styles: [":host{position:sticky;top:0;z-index:2;display:block}mat-toolbar{gap:.5rem}.spacer{flex:1}mat-toolbar>button:first-child{margin-left:-.75rem}h1{margin:0;font:inherit;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}h1.provisional{opacity:.8}\n"],
 		dependencies: [
 			{
@@ -404,7 +407,7 @@ i0.ɵɵngDeclareClassMetadata({
 				MatMenuModule
 			],
 			changeDetection: ChangeDetectionStrategy.OnPush,
-			template: "<mat-toolbar>\n  @let up = place.up();\n  <!-- The root first: its leading slot is the navigation menu. -->\n  @if (!up) {\n    @if (menu(); as menu) {\n      <!-- A count of what needs attention behind the menu, hidden at 0; the label\n           says it in words, since a badge is only seen. -->\n      <button\n        matIconButton\n        [matMenuTriggerFor]=\"menu\"\n        [attr.aria-label]=\"menuLabel()\"\n        [matBadge]=\"menuBadge()\"\n        [matBadgeHidden]=\"!menuBadge()\"\n        matBadgeSize=\"small\"\n      >\n        <mat-icon>menu</mat-icon>\n      </button>\n    }\n    <!-- A top-level screen beside the root may name itself; the root is the app. -->\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text ?? title() }}</h1>\n  } @else {\n    <!-- A button, not an `a`: the rule that centres a glyph in its circle is\n         `button[matIconButton]`, an element selector. -->\n    <button matIconButton [routerLink]=\"up.path\" [queryParams]=\"up.query\" [attr.aria-label]=\"up.label\">\n      <mat-icon>arrow_back</mat-icon>\n    </button>\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text }}</h1>\n  }\n  <span class=\"spacer\"></span>\n  <ng-content />\n  @if (place.actions(); as actions) {\n    <ng-container [ngTemplateOutlet]=\"actions\" />\n  }\n</mat-toolbar>\n",
+			template: "<mat-toolbar>\n  @let up = place.up();\n  <!-- The root first: its leading slot is the navigation menu. -->\n  @if (!up) {\n    @if (menu(); as menu) {\n      <!-- A count of what needs attention behind the menu, hidden at 0; the label\n           says it in words, since a badge is only seen. -->\n      <button\n        matIconButton\n        [matMenuTriggerFor]=\"menu\"\n        [attr.aria-label]=\"menuLabel()\"\n        [matBadge]=\"menuBadge()\"\n        [matBadgeHidden]=\"!menuBadge()\"\n        matBadgeSize=\"small\"\n      >\n        <mat-icon>menu</mat-icon>\n      </button>\n    }\n    <!-- A top-level screen beside the root may name itself; the root is the app. -->\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text ?? title() }}</h1>\n  } @else {\n    <!-- A button, not an `a`: the rule that centres a glyph in its circle is\n         `button[matIconButton]`, an element selector. -->\n    @if (up.opener && place.opened()) {\n      <button matIconButton (click)=\"location.back()\" [attr.aria-label]=\"up.label\">\n        <mat-icon>arrow_back</mat-icon>\n      </button>\n    } @else {\n      <button matIconButton [routerLink]=\"up.path\" [queryParams]=\"up.query\" [attr.aria-label]=\"up.label\">\n        <mat-icon>arrow_back</mat-icon>\n      </button>\n    }\n    <h1 [class.provisional]=\"place.title()?.provisional\">{{ place.title()?.text }}</h1>\n  }\n  <span class=\"spacer\"></span>\n  <ng-content />\n  @if (place.actions(); as actions) {\n    <ng-container [ngTemplateOutlet]=\"actions\" />\n  }\n</mat-toolbar>\n",
 			styles: [":host{position:sticky;top:0;z-index:2;display:block}mat-toolbar{gap:.5rem}.spacer{flex:1}mat-toolbar>button:first-child{margin-left:-.75rem}h1{margin:0;font:inherit;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}h1.provisional{opacity:.8}\n"]
 		}]
 	}],

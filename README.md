@@ -43,13 +43,18 @@ written.
   `'Menu — 2 sync conflicts need attention'`.
 - **Every route but the root declares `data.up` or `data.top: true`** (dev-lint
   #1793 flags one with neither). `top` is a peer main screen that keeps the menu,
-  for an app with several equal ones; a screen opened from the menu is drilled
-  in and declares up. `TOP` and `UP` name the keys.
+  for an app with several equal ones: a destination the menu lists, as a
+  navigation drawer's are. A utility screen (settings) is drilled in and
+  declares up. `TOP` and `UP` name the keys.
 - **Up is declared on the route**, never set by a page:
   `{ path: 's/:id/w/:run', data: { up: '/s/:id' } }`. The long form,
   `{ path: '/s/:id', keep: ['task'], label: 'the session' }`, carries query
   parameters over and names the arrow for a screen reader. Up is the parent screen, not history, and a
   declaration is what a lint can check without running the app.
+- **A screen with several parents** (a detail many lists open, a settings
+  screen reached from anywhere) adds `opener: true`: up returns to the screen
+  that opened it, as back does, and goes to `path` only when nothing in the app
+  did — Android's "Up vs Back" for a screen with multiple entry points.
 - **`scaffoldTitle(() => …)`** in a page's constructor names the screen for as
   long as the page is on view.
 - **`Sheets.open(…)` and `Dialogs.open(…)`** in place of `MatBottomSheet` and

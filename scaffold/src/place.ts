@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
-import { filter, map } from 'rxjs';
+import { filter, map, scan } from 'rxjs';
 
 import { declaredUp, resolveUp, type Up } from './up';
 
@@ -39,6 +39,19 @@ export class Place {
       map(() => upOf(this.router.routerState.snapshot.root)),
     ),
     { initialValue: upOf(this.router.routerState.snapshot.root) },
+  );
+
+  /**
+   * Whether an in-app screen is behind this one, so up may be back. False on
+   * the first screen the app showed: back from it would leave the app.
+   */
+  readonly opened: Signal<boolean> = toSignal(
+    this.router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      scan((shown) => shown + 1, this.router.navigated ? 1 : 0),
+      map((shown) => shown > 1),
+    ),
+    { initialValue: false },
   );
 
   readonly title = signal<Title | undefined>(undefined);

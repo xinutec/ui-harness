@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { Location, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
@@ -35,6 +35,7 @@ import { Place } from './place';
 })
 export class Scaffold {
   protected readonly place = inject(Place);
+  protected readonly location = inject(Location);
 
   /** The app's name, on a screen with no up that does not name itself. */
   readonly title = input.required<string>();
