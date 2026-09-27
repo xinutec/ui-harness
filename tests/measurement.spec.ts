@@ -367,6 +367,28 @@ test('a FAB with nav-clearance is NOT occluded', async ({ page }) => {
   expect(occ).toEqual([]);
 });
 
+// coach's shell, reduced: content scrolls between the bars, and a control below
+// its fold is clipped by the scroller while its centre lies over the nav. That is
+// a scroll concern, like a centre off the screen; the same control scrolled into
+// the scroller's view is reachable.
+const scrolledPastTheFold = `
+  <div style="display: flex; flex-direction: column; height: 100dvh;">
+    <main style="flex: 1; min-height: 0; overflow-y: auto;">
+      <div style="height: calc(100dvh - 60px - 8px);"></div>
+      <button class="below" style="height: 40px;">below the fold</button>
+      <div style="height: 400px;"></div>
+    </main>
+    <nav style="flex: none; height: 60px; background: #333;">nav</nav>
+  </div>`;
+
+test('a control scrolled out of its scroller is not occluded by what lies beyond it', async ({
+  page,
+}) => {
+  await page.setContent(phonePage(scrolledPastTheFold));
+  const occ = await page.evaluate(findOccludedControls, ['button', []] as [string, string[]]);
+  expect(occ).toEqual([]);
+});
+
 test('a pointer-events:none overlay does not count as occluding', async ({ page }) => {
   // A full-screen scrim with pointer-events:none must not read as covering the
   // button beneath it — elementFromPoint sees through it.

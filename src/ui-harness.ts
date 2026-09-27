@@ -637,8 +637,8 @@ export interface Occlusion {
  *
  * Hit-tests each visible control's own centre with `document.elementFromPoint`: a
  * reachable control returns itself or a descendant, anything else on top means it
- * cannot be tapped. Controls whose centre is off-screen are skipped — a scroll concern,
- * not occlusion. `elementFromPoint` honours `pointer-events`, so a
+ * cannot be tapped. Controls whose centre is off-screen, or outside a scrolling
+ * ancestor, are skipped — a scroll concern, not occlusion. `elementFromPoint` honours `pointer-events`, so a
  * `pointer-events:none` overlay wrapper is transparent and does not false-positive.
  *
  * `args` is [selector, allow]; `allow` names containers whose controls are
@@ -646,6 +646,16 @@ export interface Occlusion {
  */
 export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 	const [selector, allow] = args;
+	// Declared inside: page.evaluate ships only this function's own source.
+	const clippedByScroller = (el: Element, x: number, y: number): boolean => {
+		for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+			const s = getComputedStyle(a);
+			if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+			const r = a.getBoundingClientRect();
+			if (x < r.left || x > r.right || y < r.top || y > r.bottom) return true;
+		}
+		return false;
+	};
 	const describe = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
@@ -667,6 +677,8 @@ export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 		const cy = r.top + r.height / 2;
 		// Centre off-screen → below the fold / scrolled away, not occluded.
 		if (cx < 0 || cy < 0 || cx > vw || cy > vh) continue;
+		// Centre clipped by a scroller → scrolled out of it, the same concern.
+		if (clippedByScroller(el, cx, cy)) continue;
 		const hit = document.elementFromPoint(cx, cy);
 		// Reachable when the topmost element at the centre IS the control or one
 		// of its descendants; anything else painting there occludes it.
