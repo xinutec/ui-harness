@@ -8,17 +8,15 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/types/xinutec-ui-scaffold.d.ts",
-      "default": "./dist/fesm2022/xinutec-ui-scaffold.mjs"
+      "types": "./types/xinutec-ui-scaffold.d.ts",
+      "default": "./fesm2022/xinutec-ui-scaffold.mjs"
+    },
+    "./package.json": {
+      "default": "./package.json"
     }
   },
   "types": "./dist/types/xinutec-ui-scaffold.d.ts",
   "sideEffects": false,
-  "scripts": {
-    "build": "ng-packagr -p ng-package.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
-  },
   "peerDependencies": {
     "@angular/cdk": "^22.1.7",
     "@angular/common": "^22.1.7",
@@ -30,24 +28,12 @@
   "dependencies": {
     "tslib": "^2.8.1"
   },
-  "devDependencies": {
-    "@angular/cdk": "^22.1.7",
-    "@angular/common": "^22.1.7",
-    "@angular/compiler": "^22.1.7",
-    "@angular/compiler-cli": "^22.1.7",
-    "@angular/core": "^22.1.7",
-    "@angular/material": "^22.1.7",
-    "@angular/platform-browser": "^22.1.7",
-    "@angular/router": "^22.1.7",
-    "ng-packagr": "^22.1.1",
-    "rxjs": "~7.8.2",
-    "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xinutec/ui-harness.git",
     "directory": "scaffold"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "module": "fesm2022/xinutec-ui-scaffold.mjs",
+  "typings": "types/xinutec-ui-scaffold.d.ts"
 }

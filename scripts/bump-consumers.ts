@@ -54,10 +54,13 @@ export interface Published {
   readonly name: string;
   /** The package's directory in this repo, as pnpm's `&path:` names it. */
   readonly path?: string;
+  /** Whether its install runs a build, which pnpm must be allowed. */
+  readonly builds: boolean;
 }
 
-export const HARNESS: Published = { name: '@xinutec/ui-harness' };
-export const SCAFFOLD: Published = { name: '@xinutec/ui-scaffold', path: '/scaffold' };
+export const HARNESS: Published = { name: '@xinutec/ui-harness', builds: true };
+/** Ships its build (README, "Scaffold"), so a permission for it is stale. */
+export const SCAFFOLD: Published = { name: '@xinutec/ui-scaffold', path: '/scaffold', builds: false };
 const PUBLISHED = [HARNESS, SCAFFOLD];
 
 const PKG = HARNESS.name;
@@ -159,6 +162,14 @@ export function rewriteAllowBuilds(text: string, sha: string, pkg: Published = H
   return moved ? out.join('\n') : null;
 }
 
+/** Drop every `allowBuilds` key for `pkg`: one that runs nothing needs none. */
+export function dropAllowBuilds(text: string, pkg: Published): string {
+  return text
+    .split('\n')
+    .filter((line) => allowLine(pkg).exec(line) === null)
+    .join('\n');
+}
+
 /**
  * Grant `sha` without withdrawing what is already granted, for the install.
  *
@@ -215,7 +226,10 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
   // workspace file or key is a broken consumer, not an npm one to skip quietly.
   const workspace = join(entry.dir, 'pnpm-workspace.yaml');
   if (!existsSync(workspace)) fail(`${workspace}: missing — pnpm consumers need one`);
-  for (const pkg of packages) {
+  for (const pkg of packages.filter((pkg) => !pkg.builds)) {
+    writeFileSync(workspace, dropAllowBuilds(readFileSync(workspace, 'utf8'), pkg));
+  }
+  for (const pkg of packages.filter((pkg) => pkg.builds)) {
     const during = allowBoth(readFileSync(workspace, 'utf8'), sha, pkg);
     if (during === null) fail(`${workspace}: found no ${pkg.name} allowBuilds key to move`);
     writeFileSync(workspace, during);
@@ -230,7 +244,7 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
   // Now, and not before: the lockfile names only `sha`, so every other key is
   // dead — the one just left behind, and any placeholder an earlier failed run
   // wrote.
-  for (const pkg of packages) {
+  for (const pkg of packages.filter((pkg) => pkg.builds)) {
     const moved = rewriteAllowBuilds(readFileSync(workspace, 'utf8'), sha, pkg);
     if (moved === null) fail(`${workspace}: found no ${pkg.name} allowBuilds key to move`);
     writeFileSync(workspace, moved);
@@ -302,7 +316,9 @@ function tidy(entry: { repo: string; dir: string; manifest: string }, sha: strin
   if (!existsSync(workspace)) return '';
   const text = readFileSync(workspace, 'utf8');
   let moved = text;
-  for (const pkg of named(entry.manifest)) moved = rewriteAllowBuilds(moved, sha, pkg) ?? moved;
+  for (const pkg of named(entry.manifest)) {
+    moved = pkg.builds ? (rewriteAllowBuilds(moved, sha, pkg) ?? moved) : dropAllowBuilds(moved, pkg);
+  }
   if (moved === text) return '';
   if (apply) writeFileSync(workspace, moved);
   return apply ? ' (dropped stale build permissions)' : ' (has stale build permissions)';

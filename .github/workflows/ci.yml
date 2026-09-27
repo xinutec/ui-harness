@@ -47,9 +47,12 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
-      # The scaffold's own install runs its ng-packagr build, as an app's does.
+      # The scaffold ships its build; the committed dist/ must be what this makes.
       - run: pnpm install --frozen-lockfile
         working-directory: scaffold
+      - run: pnpm run build
+        working-directory: scaffold
+      - run: git diff --exit-code --stat -- scaffold/dist
       - run: pnpm test
         working-directory: scaffold
 

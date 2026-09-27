@@ -166,8 +166,44 @@
       "env": {
         "CI": "true"
       },
-      "name": "scaffold: install and build (ng-packagr, as an app's install runs it)",
+      "name": "scaffold: install (frozen, from its own lockfile)",
       "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--no-warn-dirty",
+        "--command",
+        "pnpm",
+        "--dir",
+        "scaffold",
+        "run",
+        "build"
+      ],
+      "artifacts": [],
+      "cwd": ".",
+      "env": {
+        "CI": "true"
+      },
+      "name": "scaffold: build (ng-packagr)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "--stat",
+        "--",
+        "scaffold/dist"
+      ],
+      "artifacts": [],
+      "cwd": ".",
+      "env": {},
+      "name": "scaffold: the committed dist/ is its build",
+      "timeout_s": 60
     },
     {
       "argv": [

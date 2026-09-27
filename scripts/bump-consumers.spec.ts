@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { allowBoth, foreignChanges, rewriteAllowBuilds, SCAFFOLD, vendorsPnpmDeps } from './bump-consumers.ts';
+import {
+  allowBoth,
+  dropAllowBuilds,
+  foreignChanges,
+  rewriteAllowBuilds,
+  SCAFFOLD,
+  vendorsPnpmDeps,
+} from './bump-consumers.ts';
 
 /**
  * The half of a bump that used to be left behind.
@@ -132,6 +139,12 @@ describe('the scaffold, beside the harness', () => {
     const out = rewriteAllowBuilds(both, NEW);
     expect(out).toContain(`  '@xinutec/ui-harness@${URL_}${NEW}': true`);
     expect(out).toContain(`  '@xinutec/ui-scaffold@${URL_}${OLD}#path:/scaffold': true`);
+  });
+
+  it('loses its key, since it builds nothing on install, and keeps the harness key', () => {
+    const out = dropAllowBuilds(both, SCAFFOLD);
+    expect(out).not.toContain('ui-scaffold');
+    expect(out).toContain(`  '@xinutec/ui-harness@${URL_}${OLD}': true`);
   });
 
   it('grants the new commit beside the old for the install', () => {

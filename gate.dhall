@@ -151,16 +151,29 @@ in  { name = "ui-harness"
         , timeout_s = 1800
         }
       , {-  The scaffold is its own install (scaffold/pnpm-lock.yaml), so the
-            rows above never touch it. The install also runs its `prepare`,
-            which is the ng-packagr build an app's install runs: this row is
-            that build, from a frozen lockfile.
+            rows above never touch it.
         -}
         G.Check::{
-        , name = "scaffold: install and build (ng-packagr, as an app's install runs it)"
+        , name = "scaffold: install (frozen, from its own lockfile)"
         , argv =
             web [ "pnpm", "--dir", "scaffold", "install", "--frozen-lockfile" ]
         , env = G.nonInteractive
         , timeout_s = 900
+        }
+      , {-  Apps install the committed dist/, never a build of their own: see
+            the README. So the build here must reproduce what is committed,
+            byte for byte, and the next row says whether it did.
+        -}
+        G.Check::{
+        , name = "scaffold: build (ng-packagr)"
+        , argv = web [ "pnpm", "--dir", "scaffold", "run", "build" ]
+        , env = G.nonInteractive
+        , timeout_s = 900
+        }
+      , G.Check::{
+        , name = "scaffold: the committed dist/ is its build"
+        , argv = [ "git", "diff", "--exit-code", "--stat", "--", "scaffold/dist" ]
+        , timeout_s = 60
         }
       , G.Check::{
         , name = "scaffold: unit specs (up, and history for overlays)"

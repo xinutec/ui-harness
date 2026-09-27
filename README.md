@@ -51,13 +51,22 @@ written.
 decorator leaving it "carries metadata an AOT build cannot instantiate" (see
 `src/awake.ts`), which is why its runtime pieces are plain classes with a thin
 adapter in each app. A bar is a template, so it needs Angular's own library
-build: `ng-packagr`, in partial compilation mode, run by `prepare` on install
-exactly as the harness's `tsc` is.
+build: `ng-packagr`, in partial compilation mode.
+
+**Its build is committed (`scaffold/dist/`), not run on install.** Built by an
+app's install, it failed in every app's CI: pnpm builds a git dependency inside
+its store, `pnpm/action-setup` puts the store under a `node_modules` directory,
+and TypeScript does not emit a file whose path runs through `node_modules`, so
+only the entry file was compiled (memview CI, 2026-09-27; reproduced by building
+under any `node_modules` path, and ng-packagr overrides a tsconfig that lists
+the roots). Shipped built, an install also skips the ~190 packages the build
+needs. The gate rebuilds it and fails if the result differs from what is
+committed; the build is byte-for-byte reproducible.
 
 **Installing it** names the directory: `pnpm add
-"github:xinutec/ui-harness#<sha>&path:/scaffold"`, and the app's
-`pnpm-workspace.yaml` must allow its build, as it does the harness's. Its own
-lockfile is in `scaffold/`; it is not a workspace member of this root.
+"github:xinutec/ui-harness#<sha>&path:/scaffold"`. It runs nothing on install,
+so it needs no `allowBuilds` entry. Its own lockfile is in `scaffold/`; it is
+not a workspace member of this root.
 
 ## Web: why it's a package (and why it builds to JS on install)
 
