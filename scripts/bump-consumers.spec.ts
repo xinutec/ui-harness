@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allowBoth, foreignChanges, rewriteAllowBuilds, vendorsPnpmDeps } from './bump-consumers.ts';
+import { allowBoth, foreignChanges, rewriteAllowBuilds, SCAFFOLD, vendorsPnpmDeps } from './bump-consumers.ts';
 
 /**
  * The half of a bump that used to be left behind.
@@ -109,6 +109,35 @@ describe('allowBoth', () => {
 
   it('reports a file with no key rather than inventing one', () => {
     expect(allowBoth(file('  lmdb: true'), NEW)).toBeNull();
+  });
+});
+
+/**
+ * The scaffold is a second package from the same repo, keyed by the same
+ * tarball with its directory after a `#`. Its key and the harness's must each
+ * move on their own: rewriting one must not collapse the other into it.
+ */
+describe('the scaffold, beside the harness', () => {
+  const both = file(
+    `  '@xinutec/ui-harness@${URL_}${OLD}': true\n  '@xinutec/ui-scaffold@${URL_}${OLD}#path:/scaffold': true`,
+  );
+
+  it('moves its own key and leaves the harness key alone', () => {
+    const out = rewriteAllowBuilds(both, NEW, SCAFFOLD);
+    expect(out).toContain(`  '@xinutec/ui-scaffold@${URL_}${NEW}#path:/scaffold': true`);
+    expect(out).toContain(`  '@xinutec/ui-harness@${URL_}${OLD}': true`);
+  });
+
+  it("is not moved by the harness's rewrite", () => {
+    const out = rewriteAllowBuilds(both, NEW);
+    expect(out).toContain(`  '@xinutec/ui-harness@${URL_}${NEW}': true`);
+    expect(out).toContain(`  '@xinutec/ui-scaffold@${URL_}${OLD}#path:/scaffold': true`);
+  });
+
+  it('grants the new commit beside the old for the install', () => {
+    const out = allowBoth(both, NEW, SCAFFOLD);
+    expect(out).toContain(`  '@xinutec/ui-scaffold@${URL_}${OLD}#path:/scaffold': true`);
+    expect(out).toContain(`  '@xinutec/ui-scaffold@${URL_}${NEW}#path:/scaffold': true`);
   });
 });
 

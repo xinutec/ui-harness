@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Raise every consumer's pin of `@xinutec/ui-harness` to one commit — in the
- * manifest, in `pnpm-workspace.yaml`'s build permission, and in the lockfile.
+ * Raise every consumer's pin of `@xinutec/ui-harness`, and of
+ * `@xinutec/ui-scaffold` where it has one, to one commit — in the manifest, in
+ * `pnpm-workspace.yaml`'s build permissions, and in the lockfile.
  *
  *   node scripts/bump-consumers.ts              # dry run against HEAD
  *   node scripts/bump-consumers.ts --apply
@@ -43,15 +44,44 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PKG = '@xinutec/ui-harness';
+/**
+ * A package this repo publishes, and the directory it is installed from.
+ *
+ * Both move together: a consumer on the scaffold pins it to the same commit as
+ * the harness, so one bump moves every package a manifest names.
+ */
+export interface Published {
+  readonly name: string;
+  /** The package's directory in this repo, as pnpm's `&path:` names it. */
+  readonly path?: string;
+}
+
+export const HARNESS: Published = { name: '@xinutec/ui-harness' };
+export const SCAFFOLD: Published = { name: '@xinutec/ui-scaffold', path: '/scaffold' };
+const PUBLISHED = [HARNESS, SCAFFOLD];
+
+const PKG = HARNESS.name;
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const CODE = dirname(REPO);
 
-/** The spec as it appears in a manifest, with or without a pin. */
-const SPEC = new RegExp(`"${PKG.replace('/', '\\/')}": "github:xinutec\\/ui-harness(#[0-9a-f]*)?"`);
+/** `text`, matched literally inside a pattern. */
+const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+
+/** The spec as it appears in a manifest, with or without a pin; the pin is group 1. */
+const specOf = (pkg: Published): RegExp =>
+  new RegExp(
+    `"${literal(pkg.name)}": "github:xinutec\\/ui-harness(?:#([0-9a-f]*))?${pkg.path ? literal(`&path:${pkg.path}`) : ''}"`,
+  );
+
+const pinned = (pkg: Published, sha: string): string =>
+  `"${pkg.name}": "github:xinutec/ui-harness#${sha}${pkg.path ? `&path:${pkg.path}` : ''}"`;
 
 /** How pnpm spells the same dependency once it has resolved it. */
 const TARBALL = 'https://codeload.github.com/xinutec/ui-harness/tar.gz/';
+
+/** The `allowBuilds` key pnpm wants for `pkg` at `sha`. */
+const keyOf = (pkg: Published, sha: string): string =>
+  `${pkg.name}@${TARBALL}${sha}${pkg.path ? `#path:${pkg.path}` : ''}`;
 
 /**
  * One `allowBuilds` entry, quotes and indentation as written.
@@ -61,9 +91,10 @@ const TARBALL = 'https://codeload.github.com/xinutec/ui-harness/tar.gz/';
  * hand in two quote styles, which is why the quote is captured rather than
  * assumed.
  */
-const ALLOW_LINE = new RegExp(
-  `^(\\s*)(['"])${PKG}@${TARBALL.replace(/[./]/g, '\\$&')}[0-9a-f]+\\2\\s*:.*$`,
-);
+const allowLine = (pkg: Published): RegExp =>
+  new RegExp(
+    `^(\\s*)(['"])${literal(pkg.name)}@${literal(TARBALL)}[0-9a-f]+${pkg.path ? literal(`#path:${pkg.path}`) : ''}\\2\\s*:.*$`,
+  );
 
 function git(args: string[], cwd: string = REPO): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -87,11 +118,20 @@ function consumers(): { repo: string; manifest: string; dir: string }[] {
   return found;
 }
 
-/** The commit a manifest currently pins, or null when it names no ref at all. */
-function pinnedCommit(manifest: string): string | null {
-  const m = SPEC.exec(readFileSync(manifest, 'utf8'));
-  const ref = m?.[1];
-  return ref ? ref.slice(1) : null;
+/** The packages from this repo a manifest names. */
+function named(manifest: string): Published[] {
+  const text = readFileSync(manifest, 'utf8');
+  return PUBLISHED.filter((pkg) => text.includes(`"${pkg.name}"`));
+}
+
+/** The commit a manifest pins `pkg` to, or null when it names no ref at all. */
+function pinnedCommit(manifest: string, pkg: Published = HARNESS): string | null {
+  return specOf(pkg).exec(readFileSync(manifest, 'utf8'))?.[1] || null;
+}
+
+/** Whether every package the manifest names is pinned to `sha`. */
+function atCommit(manifest: string, sha: string): boolean {
+  return named(manifest).every((pkg) => pinnedCommit(manifest, pkg) === sha);
 }
 
 /**
@@ -103,18 +143,18 @@ function pinnedCommit(manifest: string): string | null {
  * that moved the manifest and left this file behind. Only one commit is pinned,
  * so only one key can be current — the rest are the residue of the bug.
  */
-export function rewriteAllowBuilds(text: string, sha: string): string | null {
+export function rewriteAllowBuilds(text: string, sha: string, pkg: Published = HARNESS): string | null {
   const out: string[] = [];
   let moved = false;
   for (const line of text.split('\n')) {
-    const m = ALLOW_LINE.exec(line);
+    const m = allowLine(pkg).exec(line);
     if (m === null) {
       out.push(line);
       continue;
     }
     if (moved) continue;
     moved = true;
-    out.push(`${m[1]}${m[2]}${PKG}@${TARBALL}${sha}${m[2]}: true`);
+    out.push(`${m[1]}${m[2]}${keyOf(pkg, sha)}${m[2]}: true`);
   }
   return moved ? out.join('\n') : null;
 }
@@ -133,15 +173,15 @@ export function rewriteAllowBuilds(text: string, sha: string): string | null {
  * Both stand for the length of the install. [`rewriteAllowBuilds`] collapses
  * them afterwards, once the lockfile names only the survivor.
  */
-export function allowBoth(text: string, sha: string): string | null {
+export function allowBoth(text: string, sha: string, pkg: Published = HARNESS): string | null {
   const out: string[] = [];
   let seen = false;
   for (const line of text.split('\n')) {
     out.push(line);
-    const m = ALLOW_LINE.exec(line);
+    const m = allowLine(pkg).exec(line);
     if (m === null || seen) continue;
     seen = true;
-    if (!line.includes(sha)) out.push(`${m[1]}${m[2]}${PKG}@${TARBALL}${sha}${m[2]}: true`);
+    if (!line.includes(sha)) out.push(`${m[1]}${m[2]}${keyOf(pkg, sha)}${m[2]}: true`);
   }
   return seen ? out.join('\n') : null;
 }
@@ -162,18 +202,24 @@ export function allowBoth(text: string, sha: string): string | null {
  * Docker, on a clean store, away from whoever did the bump.
  */
 function bump(entry: { manifest: string; dir: string }, sha: string): void {
-  const text = readFileSync(entry.manifest, 'utf8');
-  const updated = text.replace(SPEC, `"${PKG}": "github:xinutec/ui-harness#${sha}"`);
-  if (updated === text) fail(`${entry.manifest}: found no ${PKG} spec to rewrite`);
-  writeFileSync(entry.manifest, updated);
+  const packages = named(entry.manifest);
+  let text = readFileSync(entry.manifest, 'utf8');
+  for (const pkg of packages) {
+    const updated = text.replace(specOf(pkg), pinned(pkg, sha));
+    if (updated === text) fail(`${entry.manifest}: found no ${pkg.name} spec to rewrite`);
+    text = updated;
+  }
+  writeFileSync(entry.manifest, text);
 
   // Every consumer is pnpm (measured 2026-08-09, all thirteen), so a missing
   // workspace file or key is a broken consumer, not an npm one to skip quietly.
   const workspace = join(entry.dir, 'pnpm-workspace.yaml');
   if (!existsSync(workspace)) fail(`${workspace}: missing — pnpm consumers need one`);
-  const during = allowBoth(readFileSync(workspace, 'utf8'), sha);
-  if (during === null) fail(`${workspace}: found no ${PKG} allowBuilds key to move`);
-  writeFileSync(workspace, during);
+  for (const pkg of packages) {
+    const during = allowBoth(readFileSync(workspace, 'utf8'), sha, pkg);
+    if (during === null) fail(`${workspace}: found no ${pkg.name} allowBuilds key to move`);
+    writeFileSync(workspace, during);
+  }
 
   // `inherit`, not `ignore`. This threw for one repo in thirteen and the error
   // carried `stdout: null, stderr: null` under ten lines of node internals, so
@@ -184,9 +230,11 @@ function bump(entry: { manifest: string; dir: string }, sha: string): void {
   // Now, and not before: the lockfile names only `sha`, so every other key is
   // dead — the one just left behind, and any placeholder an earlier failed run
   // wrote.
-  const moved = rewriteAllowBuilds(readFileSync(workspace, 'utf8'), sha);
-  if (moved === null) fail(`${workspace}: found no ${PKG} allowBuilds key to move`);
-  writeFileSync(workspace, moved);
+  for (const pkg of packages) {
+    const moved = rewriteAllowBuilds(readFileSync(workspace, 'utf8'), sha, pkg);
+    if (moved === null) fail(`${workspace}: found no ${pkg.name} allowBuilds key to move`);
+    writeFileSync(workspace, moved);
+  }
 }
 
 /**
@@ -249,12 +297,13 @@ export function foreignChanges(porcelain: string): string[] {
  *
  * Returns what to say about it, so a repo needing nothing stays a quiet line.
  */
-function tidy(entry: { repo: string; dir: string }, sha: string, apply: boolean): string {
+function tidy(entry: { repo: string; dir: string; manifest: string }, sha: string, apply: boolean): string {
   const workspace = join(entry.dir, 'pnpm-workspace.yaml');
   if (!existsSync(workspace)) return '';
   const text = readFileSync(workspace, 'utf8');
-  const moved = rewriteAllowBuilds(text, sha);
-  if (moved === null || moved === text) return '';
+  let moved = text;
+  for (const pkg of named(entry.manifest)) moved = rewriteAllowBuilds(moved, sha, pkg) ?? moved;
+  if (moved === text) return '';
   if (apply) writeFileSync(workspace, moved);
   return apply ? ' (dropped stale build permissions)' : ' (has stale build permissions)';
 }
@@ -307,7 +356,7 @@ function main(): void {
   if (unknown.length > 0) fail(`not a consumer of ${PKG}: ${unknown.join(', ')}`);
 
   const willTouch = targets.filter(
-    (entry) => pinnedCommit(entry.manifest) !== sha || tidy(entry, sha, false) !== '',
+    (entry) => !atCommit(entry.manifest, sha) || tidy(entry, sha, false) !== '',
   );
   if (apply) {
     const risky = willTouch
@@ -330,7 +379,7 @@ function main(): void {
   let changed = 0;
   for (const entry of targets) {
     const current = pinnedCommit(entry.manifest);
-    if (current === sha) {
+    if (atCommit(entry.manifest, sha)) {
       // ⚠ **Already pinned is where residue survives**, and skipping outright is
       // how it accumulated: a repo at the right commit still carries the
       // placeholders pnpm wrote beside older ones, each an unapproved build
