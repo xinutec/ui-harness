@@ -17,9 +17,9 @@ async function serve(page: import('@playwright/test').Page, body: string): Promi
   );
 }
 
-/** A bar whose leading icon button shows `icon`. */
-const bar = (icon: string): string =>
-  `<ui-scaffold><mat-toolbar><button><mat-icon>${icon}</mat-icon></button><h1>screen</h1></mat-toolbar></ui-scaffold>`;
+/** A bar whose leading icon button shows `icon`, titled `title`. */
+const bar = (icon: string, title = 'screen'): string =>
+  `<ui-scaffold><mat-toolbar><button><mat-icon>${icon}</mat-icon></button><h1>${title}</h1></mat-toolbar></ui-scaffold>`;
 
 /** A button opening a sheet, wired into history as `Sheets` wires it, or not at all. */
 const opener = `
@@ -49,6 +49,12 @@ test('a detail screen that kept the root menu is named', async ({ page }) => {
   await serve(page, bar('menu'));
   await page.goto(`${ORIGIN}/s/1`);
   await expect(expectUpInTheBar(page)).rejects.toThrow(/leads with "menu", not arrow_back/);
+});
+
+test('a detail screen that never named itself is named', async ({ page }) => {
+  await serve(page, bar('arrow_back', ''));
+  await page.goto(`${ORIGIN}/s/1`);
+  await expect(expectUpInTheBar(page)).rejects.toThrow(/heading is empty/);
 });
 
 test('back closes a sheet wired into history, and stays on the screen', async ({ page }) => {

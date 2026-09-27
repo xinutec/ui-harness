@@ -236,7 +236,7 @@ test('the suite really runs at phone geometry', async ({ page }) => {
   not merely *wrong-coloured*; dev-lint's `DL-CANVAS-SYSTEM-TOKEN` covers the
   known cause statically.
 - `expectUpInTheBar(page)` — on a screen whose route declares up, the
-  scaffold's bar leads with `arrow_back`. Call it on every detail screen the
+  scaffold's bar leads with `arrow_back` and its heading names the screen. Call it on every detail screen the
   suite visits: the scaffold's own tests cannot see which routes an app
   declared.
 - `expectBackClosesOverlay(page, open)` — `open` opens a sheet or dialog; back

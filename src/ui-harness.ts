@@ -1092,7 +1092,11 @@ export async function expectNoStarvedText(
 /** The overlays Material draws: a bottom sheet or a dialog. */
 const OVERLAY = "mat-bottom-sheet-container, mat-dialog-container";
 
-/** Call on a screen whose route declares up: the bar's leading icon is `arrow_back`. */
+/**
+ * Call on a screen whose route declares up: the bar's leading icon is
+ * `arrow_back`, and its heading names the screen. A page that never calls
+ * `scaffoldTitle` leaves the arrow beside an empty heading.
+ */
 export async function expectUpInTheBar(page: Page): Promise<void> {
 	await page.locator("ui-scaffold mat-toolbar").waitFor();
 	const leading = await page.evaluate(
@@ -1105,6 +1109,14 @@ export async function expectUpInTheBar(page: Page): Promise<void> {
 			`the bar leads with ${leading === null ? "no icon button" : `"${leading}"`}, not arrow_back — does the route declare up?`,
 		);
 	}
+	// A name can arrive after a request, so it is waited for.
+	const named = await page
+		.waitForFunction(() => (document.querySelector("ui-scaffold h1")?.textContent?.trim() ?? "") !== "", null, {
+			timeout: 5_000,
+		})
+		.then(() => true)
+		.catch(() => false);
+	if (!named) throw new LayoutError("the bar's heading is empty — does the page call scaffoldTitle?");
 }
 
 /**
