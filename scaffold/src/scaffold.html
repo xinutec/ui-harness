@@ -3,7 +3,16 @@
   <!-- The root first: its leading slot is the navigation menu. -->
   @if (!up) {
     @if (menu(); as menu) {
-      <button matIconButton [matMenuTriggerFor]="menu" aria-label="Menu">
+      <!-- A count of what needs attention behind the menu, hidden at 0; the label
+           says it in words, since a badge is only seen. -->
+      <button
+        matIconButton
+        [matMenuTriggerFor]="menu"
+        [attr.aria-label]="menuLabel()"
+        [matBadge]="menuBadge()"
+        [matBadgeHidden]="!menuBadge()"
+        matBadgeSize="small"
+      >
         <mat-icon>menu</mat-icon>
       </button>
     }

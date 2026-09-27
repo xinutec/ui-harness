@@ -38,6 +38,9 @@ written.
   its own name. What the
   element holds is drawn at the end on every screen; a page adds its own
   actions after it with `<ng-template scaffoldActions>`.
+- **A count on the menu button**: `[menuBadge]="n"` draws Material's badge on
+  it (hidden at 0), and `[menuLabel]` says it in words, for example
+  `'Menu — 2 sync conflicts need attention'`.
 - **Every route but the root declares `data.up` or `data.top: true`** (dev-lint
   #1793 flags one with neither). `top` is a peer main screen that keeps the menu,
   for an app with several equal ones; a screen opened from the menu is drilled

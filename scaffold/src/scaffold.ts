@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule, type MatMenuPanel } from '@angular/material/menu';
@@ -19,7 +20,15 @@ import { Place } from './place';
  */
 @Component({
   selector: 'ui-scaffold',
-  imports: [NgTemplateOutlet, RouterLink, MatToolbarModule, MatButtonModule, MatIconModule, MatMenuModule],
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    MatToolbarModule,
+    MatBadgeModule,
+    MatButtonModule,
+    MatIconModule,
+    MatMenuModule,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './scaffold.html',
   styleUrl: './scaffold.scss',
@@ -31,4 +40,8 @@ export class Scaffold {
   readonly title = input.required<string>();
   /** What the root screen's leading `menu` opens. No menu, no button. */
   readonly menu = input<MatMenuPanel>();
+  /** How many things behind the menu need attention, as a badge on its button. 0 shows none. */
+  readonly menuBadge = input(0);
+  /** The menu button's accessible name; one with a badge should say what it counts. */
+  readonly menuLabel = input('Menu');
 }

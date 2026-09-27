@@ -155,6 +155,10 @@ export declare class Scaffold {
   readonly title: import("@angular/core").InputSignal<string>;
   /** What the root screen's leading `menu` opens. No menu, no button. */
   readonly menu: import("@angular/core").InputSignal<MatMenuPanel<any> | undefined>;
+  /** How many things behind the menu need attention, as a badge on its button. 0 shows none. */
+  readonly menuBadge: import("@angular/core").InputSignal<number>;
+  /** The menu button's accessible name; one with a badge should say what it counts. */
+  readonly menuLabel: import("@angular/core").InputSignal<string>;
   static ɵfac: i0.ɵɵFactoryDeclaration<Scaffold, never>;
   static ɵcmp: i0.ɵɵComponentDeclaration<Scaffold, "ui-scaffold", never, {
     "title": {
@@ -164,6 +168,16 @@ export declare class Scaffold {
     };
     "menu": {
       "alias": "menu";
+      "required": false;
+      "isSignal": true;
+    };
+    "menuBadge": {
+      "alias": "menuBadge";
+      "required": false;
+      "isSignal": true;
+    };
+    "menuLabel": {
+      "alias": "menuLabel";
       "required": false;
       "isSignal": true;
     };
