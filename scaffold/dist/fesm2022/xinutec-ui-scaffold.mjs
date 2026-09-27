@@ -14,12 +14,31 @@ import * as i4 from "@angular/material/menu";
 import { MatMenuModule } from "@angular/material/menu";
 import * as i1 from "@angular/material/toolbar";
 import { MatToolbarModule } from "@angular/material/toolbar";
+const open = /* @__PURE__ */ new Set();
+const watched = /* @__PURE__ */ new WeakSet();
+let opened = 0;
 function wireBack(history, closed) {
-	history.go(history.path(true), "", { overlay: true });
+	skipGoneOverlays(history);
+	opened += 1;
+	const id = `${Date.now()}-${opened}`;
+	open.add(id);
+	history.go(history.path(true), "", { overlay: id });
 	closed.subscribe(() => {
-		const state = history.getState();
-		if (typeof state === "object" && state !== null && "overlay" in state) history.back();
+		open.delete(id);
+		if (overlayOf(history.getState()) === id) history.back();
 	});
+}
+function skipGoneOverlays(history) {
+	if (watched.has(history)) return;
+	watched.add(history);
+	history.subscribe((event) => {
+		const id = overlayOf(event.state);
+		if (id !== void 0 && !open.has(id)) history.back();
+	});
+}
+function overlayOf(state) {
+	if (typeof state !== "object" || state === null || !("overlay" in state)) return void 0;
+	return typeof state.overlay === "string" ? state.overlay : void 0;
 }
 var Sheets = class Sheets {
 	sheet = inject(MatBottomSheet);

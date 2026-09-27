@@ -23,7 +23,7 @@ export declare class Dialogs {
   static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
 /** The part of `Location` wiring an overlay into history uses. */
-type History = Pick<Location, 'go' | 'back' | 'path' | 'getState'>;
+type History = Pick<Location, 'go' | 'back' | 'path' | 'getState' | 'subscribe'>;
 /**
  * Let the back gesture close an overlay, and close only the overlay.
  *
