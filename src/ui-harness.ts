@@ -1099,11 +1099,15 @@ const OVERLAY = "mat-bottom-sheet-container, mat-dialog-container";
  */
 export async function expectUpInTheBar(page: Page): Promise<void> {
 	await page.locator("ui-scaffold mat-toolbar").waitFor();
-	const leading = await page.evaluate(
-		() =>
-			document.querySelector("ui-scaffold mat-toolbar > button:first-child mat-icon")?.textContent?.trim() ??
-			null,
-	);
+	const icon = "ui-scaffold mat-toolbar > button:first-child mat-icon";
+	// Waited for, like the name: after an in-app navigation the URL can change
+	// before the bar has drawn the new screen's arrow.
+	await page
+		.waitForFunction((sel) => document.querySelector(sel)?.textContent?.trim() === "arrow_back", icon, {
+			timeout: 5_000,
+		})
+		.catch(() => undefined);
+	const leading = await page.evaluate((sel) => document.querySelector(sel)?.textContent?.trim() ?? null, icon);
 	if (leading !== "arrow_back") {
 		throw new LayoutError(
 			`the bar leads with ${leading === null ? "no icon button" : `"${leading}"`}, not arrow_back — does the route declare up?`,
