@@ -102,6 +102,12 @@ i0.ɵɵngDeclareClassMetadata({
 	}]
 });
 const UP = "up";
+const TOP = "top";
+function declaredUp(data) {
+	const up = data["up"];
+	if (up !== void 0 && data["top"] === true) throw new Error("a route declares both up and top");
+	return up;
+}
 function resolveUp(declared, params, query) {
 	const { path, keep = [], label = "back" } = typeof declared === "string" ? { path: declared } : declared;
 	const filled = path.split("/").map((segment) => {
@@ -159,7 +165,7 @@ function upOf(root) {
 		route = route.firstChild;
 		Object.assign(params, route.params);
 	}
-	const declared = route.data["up"];
+	const declared = declaredUp(route.data);
 	return declared === void 0 ? void 0 : resolveUp(declared, params, route.queryParams);
 }
 function scaffoldTitle(text) {
@@ -383,6 +389,6 @@ i0.ɵɵngDeclareClassMetadata({
 		}]
 	}
 });
-export { Dialogs, Place, Scaffold, ScaffoldActions, Sheets, UP, resolveUp, scaffoldTitle, wireBack };
+export { Dialogs, Place, Scaffold, ScaffoldActions, Sheets, TOP, UP, declaredUp, resolveUp, scaffoldTitle, wireBack };
 
 //# sourceMappingURL=xinutec-ui-scaffold.mjs.map

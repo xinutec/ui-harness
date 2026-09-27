@@ -38,6 +38,10 @@ written.
   its own name. What the
   element holds is drawn at the end on every screen; a page adds its own
   actions after it with `<ng-template scaffoldActions>`.
+- **Every route but the root declares `data.up` or `data.top: true`** (dev-lint
+  #1793 flags one with neither). `top` is a peer main screen that keeps the menu,
+  for an app with several equal ones; a screen opened from the menu is drilled
+  in and declares up. `TOP` and `UP` name the keys.
 - **Up is declared on the route**, never set by a page:
   `{ path: 's/:id/w/:run', data: { up: '/s/:id' } }`. The long form,
   `{ path: '/s/:id', keep: ['task'], label: 'the session' }`, carries query

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveUp } from './up';
+import { declaredUp, resolveUp } from './up';
 
 describe('resolveUp', () => {
   it('is the path as declared when it names no parameter', () => {
@@ -25,5 +25,16 @@ describe('resolveUp', () => {
 
   it('refuses a parent the route cannot fill', () => {
     expect(() => resolveUp('/s/:id', {}, {})).toThrow(/no parameter :id/);
+  });
+});
+
+describe('declaredUp', () => {
+  it('is the route\'s up, and none for a top screen', () => {
+    expect(declaredUp({ up: '/' })).toBe('/');
+    expect(declaredUp({ top: true })).toBeUndefined();
+  });
+
+  it('refuses a route that declares both', () => {
+    expect(() => declaredUp({ up: '/', top: true })).toThrow(/both up and top/);
   });
 });

@@ -31,6 +31,24 @@ export interface Up {
 export const UP = 'up';
 
 /**
+ * The key a route's `data` sets to `true` for a peer top-level screen: one of
+ * several equal main screens, which keeps the menu and has no up. Every route
+ * but the root declares one or the other (dev-lint #1793); a screen opened from
+ * the menu is drilled in, and declares up.
+ */
+export const TOP = 'top';
+
+/**
+ * A route's up, from its `data`: none for the root or a `top` screen. Throws on
+ * a route that declares both, which says two contradictory things about its bar.
+ */
+export function declaredUp(data: Readonly<Record<string, unknown>>): UpDeclaration | undefined {
+  const up = data[UP] as UpDeclaration | undefined;
+  if (up !== undefined && data[TOP] === true) throw new Error('a route declares both up and top');
+  return up;
+}
+
+/**
  * Fill `declared` from the parameters and query of the screen on view.
  *
  * Throws on a `:name` the route does not supply: that is a route table naming

@@ -14,7 +14,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 
-import { resolveUp, UP, type Up, type UpDeclaration } from './up';
+import { declaredUp, resolveUp, type Up } from './up';
 
 /** A screen's name in the bar, and whether it is a stand-in for one not known yet. */
 export interface Title {
@@ -53,7 +53,7 @@ function upOf(root: ActivatedRouteSnapshot): Up | undefined {
     route = route.firstChild;
     Object.assign(params, route.params);
   }
-  const declared = route.data[UP] as UpDeclaration | undefined;
+  const declared = declaredUp(route.data);
   return declared === undefined ? undefined : resolveUp(declared, params, route.queryParams);
 }
 
