@@ -1,6 +1,7 @@
 import { ComponentType } from "@angular/cdk/portal";
 import { MatBottomSheetConfig, MatBottomSheetRef } from "@angular/material/bottom-sheet";
 import { MatDialogConfig, MatDialogRef } from "@angular/material/dialog";
+import { NavigationExtras } from "@angular/router";
 import * as i0 from "@angular/core";
 import { OnDestroy, OnInit, Signal, TemplateRef } from "@angular/core";
 import { Location } from "@angular/common";
@@ -10,7 +11,14 @@ import { MatMenuPanel } from "@angular/material/menu";
 export declare class Sheets {
   private readonly sheet;
   private readonly location;
+  private readonly router;
   open<T, D = unknown, R = unknown>(component: ComponentType<T>, config?: MatBottomSheetConfig<D>): MatBottomSheetRef<T, R>;
+  /**
+   * Close `ref` and go to `commands`, in its history entry's place: pushed on top,
+   * the new screen would strand the sheet's entry under it, and back from that
+   * screen would stop on nothing (#1801). For a sheet that navigates as it closes.
+   */
+  dismissTo<R>(ref: MatBottomSheetRef<unknown, R>, commands: readonly unknown[], extras?: NavigationExtras): Promise<boolean>;
   static ɵfac: i0.ɵɵFactoryDeclaration<Sheets, never>;
   static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
@@ -23,7 +31,7 @@ export declare class Dialogs {
   static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
 /** The part of `Location` wiring an overlay into history uses. */
-type History = Pick<Location, 'go' | 'back' | 'path' | 'getState' | 'subscribe'>;
+type History = Pick<Location, 'go' | 'back' | 'path' | 'getState'>;
 /**
  * Let the back gesture close an overlay, and close only the overlay.
  *
@@ -33,8 +41,17 @@ type History = Pick<Location, 'go' | 'back' | 'path' | 'getState' | 'subscribe'>
  * for back to spend itself on; nothing here closes anything. The entry has to be
  * taken away again when the overlay closes some other way, or the next back
  * press is spent on nothing.
+ *
+ * ⚠ An overlay that closes and navigates at once must not push the new screen
+ * on top of its entry: the entry is only taken away after the exit animation,
+ * when it is no longer on top, and is left under the new screen. So such a
+ * navigation replaces the entry instead — see `Sheets.dismissTo`. Stepping past
+ * a stranded entry on back was tried, and fights the router's own handling of
+ * the same popstate (#1801).
  */
 export declare function wireBack(history: History, closed: Observable<unknown>): void;
+/** Whether the entry on top of history is an overlay's. */
+declare function overlayOnTop(history: Pick<History, 'getState'>): boolean;
 /**
  * Where up goes from a screen, declared on its route and read by the bar.
  *

@@ -3,8 +3,8 @@ import * as i0 from "@angular/core";
 import { ChangeDetectionStrategy, Component, DestroyRef, Directive, Injectable, TemplateRef, effect, inject, input, signal } from "@angular/core";
 import { MatBottomSheet } from "@angular/material/bottom-sheet";
 import { MatDialog } from "@angular/material/dialog";
-import { toSignal } from "@angular/core/rxjs-interop";
 import { NavigationEnd, Router, RouterLink } from "@angular/router";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { filter, map } from "rxjs";
 import * as i2 from "@angular/material/button";
 import { MatButtonModule } from "@angular/material/button";
@@ -14,39 +14,32 @@ import * as i4 from "@angular/material/menu";
 import { MatMenuModule } from "@angular/material/menu";
 import * as i1 from "@angular/material/toolbar";
 import { MatToolbarModule } from "@angular/material/toolbar";
-const open = /* @__PURE__ */ new Set();
-const watched = /* @__PURE__ */ new WeakSet();
-let opened = 0;
 function wireBack(history, closed) {
-	skipGoneOverlays(history);
-	opened += 1;
-	const id = `${Date.now()}-${opened}`;
-	open.add(id);
-	history.go(history.path(true), "", { overlay: id });
+	history.go(history.path(true), "", { overlay: true });
 	closed.subscribe(() => {
-		open.delete(id);
-		if (overlayOf(history.getState()) === id) history.back();
+		if (overlayOnTop(history)) history.back();
 	});
 }
-function skipGoneOverlays(history) {
-	if (watched.has(history)) return;
-	watched.add(history);
-	history.subscribe((event) => {
-		const id = overlayOf(event.state);
-		if (id !== void 0 && !open.has(id)) history.back();
-	});
-}
-function overlayOf(state) {
-	if (typeof state !== "object" || state === null || !("overlay" in state)) return void 0;
-	return typeof state.overlay === "string" ? state.overlay : void 0;
+function overlayOnTop(history) {
+	const state = history.getState();
+	return typeof state === "object" && state !== null && "overlay" in state;
 }
 var Sheets = class Sheets {
 	sheet = inject(MatBottomSheet);
 	location = inject(Location);
+	router = inject(Router);
 	open(component, config) {
 		const ref = this.sheet.open(component, config);
 		wireBack(this.location, ref.afterDismissed());
 		return ref;
+	}
+	dismissTo(ref, commands, extras) {
+		const replaceUrl = overlayOnTop(this.location) || extras?.replaceUrl;
+		ref.dismiss();
+		return this.router.navigate(commands, {
+			...extras,
+			replaceUrl
+		});
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
