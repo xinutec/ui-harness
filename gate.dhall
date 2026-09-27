@@ -150,6 +150,24 @@ in  { name = "ui-harness"
         , env = G.nonInteractive
         , timeout_s = 1800
         }
+      , {-  The scaffold is its own install (scaffold/pnpm-lock.yaml), so the
+            rows above never touch it. The install also runs its `prepare`,
+            which is the ng-packagr build an app's install runs: this row is
+            that build, from a frozen lockfile.
+        -}
+        G.Check::{
+        , name = "scaffold: install and build (ng-packagr, as an app's install runs it)"
+        , argv =
+            web [ "pnpm", "--dir", "scaffold", "install", "--frozen-lockfile" ]
+        , env = G.nonInteractive
+        , timeout_s = 900
+        }
+      , G.Check::{
+        , name = "scaffold: unit specs (up, and history for overlays)"
+        , argv = web [ "pnpm", "--dir", "scaffold", "test" ]
+        , env = G.nonInteractive
+        , timeout_s = 900
+        }
       , {-  dev-lint's DL-KTLINT discovers apps by
             `<module>/app/src/main/AndroidManifest.xml`, which a library module
             has none of — so without this the shell would be the one Kotlin in the

@@ -15,6 +15,7 @@
 			"src/**/*.ts",
 			"tests/**/*.ts",
 			"scripts/**/*.ts",
+			"scaffold/src/**/*.ts",
 			"*.config.ts"
 		]
 	}

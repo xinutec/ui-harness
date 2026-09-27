@@ -1,0 +1,57 @@
+{
+  "name": "@xinutec/ui-scaffold",
+  "version": "0.1.0",
+  "description": "The fleet's Angular app frame: the top bar, where up goes from each route, and sheets and dialogs the back gesture closes. An Angular library, built by ng-packagr, beside @xinutec/ui-harness in the same repo.",
+  "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "ng-package.json",
+    "tsconfig.json"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/xinutec-ui-scaffold.d.ts",
+      "default": "./dist/fesm2022/xinutec-ui-scaffold.mjs"
+    }
+  },
+  "types": "./dist/types/xinutec-ui-scaffold.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json",
+    "prepare": "ng-packagr -p ng-package.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@angular/cdk": "^22.1.7",
+    "@angular/common": "^22.1.7",
+    "@angular/core": "^22.1.7",
+    "@angular/material": "^22.1.7",
+    "@angular/router": "^22.1.7",
+    "rxjs": "~7.8.2"
+  },
+  "dependencies": {
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@angular/cdk": "^22.1.7",
+    "@angular/common": "^22.1.7",
+    "@angular/compiler": "^22.1.7",
+    "@angular/compiler-cli": "^22.1.7",
+    "@angular/core": "^22.1.7",
+    "@angular/material": "^22.1.7",
+    "@angular/platform-browser": "^22.1.7",
+    "@angular/router": "^22.1.7",
+    "ng-packagr": "^22.1.1",
+    "rxjs": "~7.8.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xinutec/ui-harness.git",
+    "directory": "scaffold"
+  },
+  "license": "UNLICENSED"
+}

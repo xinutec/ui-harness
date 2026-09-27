@@ -1,0 +1,11 @@
+# Its own install, not a workspace member of the repo root: an app installs this
+# package alone (`github:xinutec/ui-harness#<sha>&path:/scaffold`), and its
+# `prepare` runs here against this lockfile.
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true
+
+# The catalog names only versions a day old (dev-lint tables/deps.dhall);
+# strict, so a younger install fails instead of writing itself an exclusion.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true

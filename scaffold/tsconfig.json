@@ -1,0 +1,24 @@
+{
+  "// why": "ng-packagr compiles src/ with this, in partial mode: the output an app's Angular build links, where a plain tsc build (the harness beside this) leaves decorators an AOT build cannot instantiate.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "dom"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": false,
+    "inlineSources": false,
+    "sourceMap": false,
+    "types": []
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true,
+    "strictInjectionParameters": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

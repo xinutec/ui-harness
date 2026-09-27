@@ -152,6 +152,47 @@
       "argv": [
         "nix",
         "develop",
+        ".#default",
+        "--no-warn-dirty",
+        "--command",
+        "pnpm",
+        "--dir",
+        "scaffold",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "artifacts": [],
+      "cwd": ".",
+      "env": {
+        "CI": "true"
+      },
+      "name": "scaffold: install and build (ng-packagr, as an app's install runs it)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
+        ".#default",
+        "--no-warn-dirty",
+        "--command",
+        "pnpm",
+        "--dir",
+        "scaffold",
+        "test"
+      ],
+      "artifacts": [],
+      "cwd": ".",
+      "env": {
+        "CI": "true"
+      },
+      "name": "scaffold: unit specs (up, and history for overlays)",
+      "timeout_s": 900
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
         ".#ktlint",
         "--no-warn-dirty",
         "--command",

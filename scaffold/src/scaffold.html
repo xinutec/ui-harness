@@ -1,0 +1,24 @@
+<mat-toolbar color="primary">
+  @let up = place.up();
+  <!-- The root first: its leading slot is the navigation menu. -->
+  @if (!up) {
+    @if (menu(); as menu) {
+      <button matIconButton [matMenuTriggerFor]="menu" aria-label="Menu">
+        <mat-icon>menu</mat-icon>
+      </button>
+    }
+    <h1>{{ title() }}</h1>
+  } @else {
+    <!-- A button, not an `a`: the rule that centres a glyph in its circle is
+         `button[matIconButton]`, an element selector. -->
+    <button matIconButton [routerLink]="up.path" [queryParams]="up.query" [attr.aria-label]="up.label">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <h1 [class.provisional]="place.title()?.provisional">{{ place.title()?.text }}</h1>
+  }
+  <span class="spacer"></span>
+  <ng-content />
+  @if (place.actions(); as actions) {
+    <ng-container [ngTemplateOutlet]="actions" />
+  }
+</mat-toolbar>

@@ -1,0 +1,41 @@
+:host {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: block;
+}
+
+mat-toolbar {
+  gap: 0.5rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* The leading icon button, whichever it is, pulled into the toolbar's own
+   padding so the icon sits where Material's leading icon does: a 48px target
+   around a 24px glyph leaves 12 on each side. */
+mat-toolbar > button:first-child {
+  margin-left: -0.75rem;
+}
+
+/* A heading names the screen, but brings a font size and margins the
+   toolbar has already decided. */
+h1 {
+  margin: 0;
+  font: inherit;
+  /* Weight rather than size: a name that outgrows its row is what the row
+     cannot afford. */
+  font-weight: 500;
+  /* One line, cut with an ellipsis. `overflow: hidden` is also what lets it
+     shrink: it removes a flex item's content floor. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A stand-in until the real name is known, quieter. */
+h1.provisional {
+  opacity: 0.8;
+}

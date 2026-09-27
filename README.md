@@ -1,6 +1,6 @@
 # @xinutec/ui-harness — the fleet's shared UI layer
 
-Two halves, one repo:
+Three parts, one repo:
 
 - **`src/` — phone-width layout checks (Playwright).** The dynamic
   layout-measurement layer (L2 of the layout-quality architecture): render a
@@ -9,6 +9,10 @@ Two halves, one repo:
 - **`android/` — the WebView app shell (Gradle).** The Activity every wrapper app
   is a WebView around: system-bar insets, page-coloured bars, back through SPA
   history, restore-on-reopen. Consumed by path, as a composite build.
+- **`scaffold/` — `@xinutec/ui-scaffold`, the Angular app frame.** The top bar,
+  where up goes from each screen, and sheets and dialogs the back gesture
+  closes. A package of its own, because it has to be built by ng-packagr: see
+  [below](#scaffold-the-angular-app-frame).
 
 They share a repo because they are the same job seen from two sides — one keeps
 the web UI honest about phone geometry, the other is the frame that UI is shown
@@ -20,6 +24,40 @@ one Activity, already drifting.
 and npm consumers pin a SHA, so an Android commit is invisible to them until they
 bump. Gradle consumers resolve by path against whatever is checked out, so a
 change to `src/` is invisible to them entirely.
+
+## Scaffold: the Angular app frame
+
+Every Angular app in the fleet draws the same top bar and wires its overlays
+into history the same way, from here. The console in memview is where it was
+written.
+
+- **`<ui-scaffold title="…" [menu]="…">`**, once, above the router. The root
+  screen gets a leading `menu` (when the app passes one) and the app's name; a
+  screen whose route declares up gets `arrow_back` and its own name. What the
+  element holds is drawn at the end on every screen; a page adds its own
+  actions after it with `<ng-template scaffoldActions>`.
+- **Up is declared on the route**, never set by a page:
+  `{ path: 's/:id/w/:run', data: { up: '/s/:id' } }`. The long form,
+  `{ path: '/s/:id', keep: ['task'], label: 'the session' }`, carries query
+  parameters over and names the arrow for a screen reader. Up is the parent screen, not history, and a
+  declaration is what a lint can check without running the app.
+- **`scaffoldTitle(() => …)`** in a page's constructor names the screen for as
+  long as the page is on view.
+- **`Sheets.open(…)` and `Dialogs.open(…)`** in place of `MatBottomSheet` and
+  `MatDialog`: each overlay gets a history entry, so a phone's back gesture
+  closes the overlay and only the overlay.
+
+**Why a second package.** The harness is built by plain `tsc`, and an Angular
+decorator leaving it "carries metadata an AOT build cannot instantiate" (see
+`src/awake.ts`), which is why its runtime pieces are plain classes with a thin
+adapter in each app. A bar is a template, so it needs Angular's own library
+build: `ng-packagr`, in partial compilation mode, run by `prepare` on install
+exactly as the harness's `tsc` is.
+
+**Installing it** names the directory: `pnpm add
+"github:xinutec/ui-harness#<sha>&path:/scaffold"`, and the app's
+`pnpm-workspace.yaml` must allow its build, as it does the harness's. Its own
+lockfile is in `scaffold/`; it is not a workspace member of this root.
 
 ## Web: why it's a package (and why it builds to JS on install)
 
