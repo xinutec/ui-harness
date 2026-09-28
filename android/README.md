@@ -114,6 +114,6 @@ each manifest (and are held identical across apps by dev-lint's
 nix develop .#android --command ./android/gradlew -p android :main:test
 ```
 
-Building any consuming app builds this too, through the composite. `scripts/verify.sh`
-runs the library's own unit tests and then builds life against it, so a breaking
+Building any consuming app builds this too, through the composite. The gate
+(`gate.dhall`) runs the library's own unit tests and then builds life against it, so a breaking
 change lands in this repo rather than in eight apps at once.
