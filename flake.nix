@@ -50,10 +50,12 @@
       devShells = nixpkgs.lib.genAttrs systems (system:
         let pkgs = nixpkgs.legacyPackages.${system}; in {
         default = pkgs.mkShell {
+          # Playwright's browsers come from the lock, not ~/Library/Caches: the
+          # driver's version must match @playwright/test's (tables/deps.dhall).
+          PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "1";
           packages = [
             # TS build (tsc) + the harness's own Playwright fixture specs (tests/).
-            # Playwright's Chromium comes from its own cache (pnpm exec playwright
-            # install), same as the consuming apps — not a Nix dependency.
             pkgs.nodejs_24
             # Explicit, unlike npm, which rides along with node. This repo was the
             # fleet's last npm tree; every consumer is pnpm, and the difference

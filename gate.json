@@ -117,27 +117,6 @@
         "--no-warn-dirty",
         "--command",
         "pnpm",
-        "exec",
-        "playwright",
-        "install",
-        "chromium"
-      ],
-      "artifacts": [],
-      "cwd": ".",
-      "env": {
-        "CI": "true"
-      },
-      "name": "playwright chromium is installed",
-      "timeout_s": 900
-    },
-    {
-      "argv": [
-        "nix",
-        "develop",
-        ".#default",
-        "--no-warn-dirty",
-        "--command",
-        "pnpm",
         "test"
       ],
       "artifacts": [],

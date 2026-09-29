@@ -131,15 +131,6 @@ in  { name = "ui-harness"
         , env = G.nonInteractive
         , timeout_s = 900
         }
-      , {-  Chromium comes from playwright's own cache; the install is idempotent
-            and fast when present.
-        -}
-        G.Check::{
-        , name = "playwright chromium is installed"
-        , argv = web [ "pnpm", "exec", "playwright", "install", "chromium" ]
-        , env = G.nonInteractive
-        , timeout_s = 900
-        }
       , {-  The specs in tests/ exercise the measurement functions against
             setContent DOM at the same Pixel-7 geometry the real checks run at —
             no app, no server.
