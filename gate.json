@@ -208,6 +208,27 @@
       "argv": [
         "nix",
         "develop",
+        ".#default",
+        "--no-warn-dirty",
+        "--command",
+        "pnpm",
+        "--dir",
+        "scaffold",
+        "run",
+        "lint:styles"
+      ],
+      "artifacts": [],
+      "cwd": ".",
+      "env": {
+        "CI": "true"
+      },
+      "name": "scaffold: stylelint (the fleet's colour rules)",
+      "timeout_s": 300
+    },
+    {
+      "argv": [
+        "nix",
+        "develop",
         ".#ktlint",
         "--no-warn-dirty",
         "--command",

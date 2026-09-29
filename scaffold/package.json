@@ -17,7 +17,8 @@
   "scripts": {
     "build": "ng-packagr -p ng-package.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:styles": "stylelint \"src/**/*.scss\""
   },
   "peerDependencies": {
     "@angular/cdk": "^22.1.7",
@@ -40,7 +41,9 @@
     "@angular/platform-browser": "^22.1.7",
     "@angular/router": "^22.1.7",
     "ng-packagr": "^22.1.1",
+    "postcss-scss": "^4.0.9",
     "rxjs": "~7.8.2",
+    "stylelint": "^17.14.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.11"
   },

@@ -172,6 +172,12 @@ in  { name = "ui-harness"
         , env = G.nonInteractive
         , timeout_s = 900
         }
+      , G.Check::{
+        , name = "scaffold: stylelint (the fleet's colour rules)"
+        , argv = web [ "pnpm", "--dir", "scaffold", "run", "lint:styles" ]
+        , env = G.nonInteractive
+        , timeout_s = 300
+        }
       , {-  dev-lint's DL-KTLINT discovers apps by
             `<module>/app/src/main/AndroidManifest.xml`, which a library module
             has none of — so without this the shell would be the one Kotlin in the
