@@ -1,0 +1,18 @@
+// Colours that must not follow the theme, because what they sit on is a photo
+// or a camera frame, not a themed surface. The one place the fleet writes them:
+// an app `@use`s this sheet and reads `var(--scrim)` where it used to write a
+// literal under a `dev-lint: allow-hardcoded-color` waiver (dev-lint #1884:
+// twenty such sites across life, coach and home, eight values between them).
+:root {
+  // A black bed behind media, and text drawn over media.
+  --media-bed: #000;
+  --on-media: #fff;
+  --on-media-shadow: 0 1px 3px rgb(0 0 0 / 80%);
+  // Scrims over media, by how much of the media must still read through.
+  --scrim-weak: rgb(0 0 0 / 40%);
+  --scrim: rgb(0 0 0 / 55%);
+  --scrim-strong: rgb(0 0 0 / 65%);
+  // A mask that dims everything but a cut-out, and the cut-out's edge.
+  --media-mask: rgb(0 0 0 / 35%);
+  --media-frame: rgb(255 255 255 / 85%);
+}
