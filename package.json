@@ -28,7 +28,7 @@
       "types": "./dist/telemetry.d.ts",
       "default": "./dist/telemetry.js"
     },
-    "./tokens.scss": "./tokens.scss"
+    "./tokens": "./tokens.scss"
   },
   "types": "./dist/ui-harness.d.ts",
   "files": [
