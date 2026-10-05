@@ -145,6 +145,7 @@ export class TelemetryCore {
       body,
       // Lets the request outlive the page on a final flush.
       keepalive: final,
+      // dev-lint: allow-ignored-error a lost trace batch is not the user's problem
     }).catch(() => undefined);
   }
 }

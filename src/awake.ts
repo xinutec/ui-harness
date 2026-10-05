@@ -183,6 +183,7 @@ export class ScreenAwake {
       this.sentinel = held;
       return;
     }
+    // dev-lint: allow-ignored-error the browser may already have taken the lock back; letting go is best-effort
     if (held && !held.released) await held.release().catch(() => undefined);
   }
 
@@ -214,6 +215,7 @@ export class ScreenAwake {
     this.sentinel = undefined;
     // Releasing a lock the browser already took back rejects, and letting go of the
     // screen is not worth an unhandled rejection.
+    // dev-lint: allow-ignored-error releasing a lock the browser already took back rejects; not worth an unhandled rejection
     if (held && !held.released) await held.release().catch(() => undefined);
   }
 

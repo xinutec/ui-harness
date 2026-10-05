@@ -124,6 +124,7 @@ export class SwUpdates {
    *  ordinary here — being offline is the common case — so it goes unreported; the
    *  next time the app becomes visible it simply tries again. */
   private backgroundCheck(): void {
+    // dev-lint: allow-ignored-error offline is the common case; the next visible moment tries again
     void this.sw.checkForUpdate().catch(() => undefined);
   }
 

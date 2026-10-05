@@ -1118,6 +1118,7 @@ export async function expectUpInTheBar(page: Page): Promise<void> {
 		.waitForFunction((sel) => document.querySelector(sel)?.textContent?.trim() === "arrow_back", icon, {
 			timeout: 5_000,
 		})
+		// dev-lint: allow-ignored-error a timeout here is fine: the assertion below reports what the bar drew
 		.catch(() => undefined);
 	const leading = await page.evaluate((sel) => document.querySelector(sel)?.textContent?.trim() ?? null, icon);
 	if (leading !== "arrow_back") {
