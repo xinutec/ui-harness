@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
@@ -26,7 +27,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.edit
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 /**
  * The Activity every one of the fleet's WebView wrapper apps is.
@@ -45,6 +48,8 @@ import androidx.core.view.WindowInsetsCompat
  *
  * ## What the shell owns
  *
+ * - **Fullscreen video.** WebView greys out a video's fullscreen button unless the
+ *   chrome client takes the view; back leaves it.
  * - **Insets, including the IME.** With edge-to-edge enforced at targetSdk 35+ the
  *   window no longer resizes for the keyboard, so the padding is applied here or
  *   the IME draws straight over the page and buries bottom sheets.
@@ -100,6 +105,7 @@ abstract class WebShellActivity : ComponentActivity() {
     private val backCallback =
         object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
+                if (leaveFullscreen()) return
                 if (onBackBeforeHistory()) return
                 if (web.canGoBack()) {
                     web.goBack()
@@ -328,7 +334,27 @@ abstract class WebShellActivity : ComponentActivity() {
      * navigation; call it yourself when app state changes the answer.
      */
     protected fun syncBack() {
-        backCallback.isEnabled = web.canGoBack() || hasExtraBackTargets()
+        backCallback.isEnabled = web.canGoBack() || hasExtraBackTargets() || fullscreen != null
+    }
+
+    /**
+     * What the page made fullscreen (a video), drawn over it, and how to tell the
+     * page it is over. Without a chrome client that takes this view, WebView greys
+     * out every fullscreen button.
+     */
+    private var fullscreen: Pair<View, WebChromeClient.CustomViewCallback>? = null
+
+    /** Back out of fullscreen, if in it; true if it was. */
+    private fun leaveFullscreen(): Boolean {
+        val (view, done) = fullscreen ?: return false
+        fullscreen = null
+        root.removeView(view)
+        WindowCompat
+            .getInsetsController(window, window.decorView)
+            .show(WindowInsetsCompat.Type.systemBars())
+        done.onCustomViewHidden()
+        syncBack()
+        return true
     }
 
     /** The client driving the main WebView. Override returning a subclass of
@@ -408,6 +434,34 @@ abstract class WebShellActivity : ComponentActivity() {
                 else -> Log.i(tag, line)
             }
             return true
+        }
+
+        // A video's fullscreen button: its view over the page, the bars hidden
+        // until a swipe. Back or the page's own exit leaves.
+        override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+            if (fullscreen != null) {
+                callback.onCustomViewHidden()
+                return
+            }
+            fullscreen = view to callback
+            view.setBackgroundColor(Color.BLACK)
+            root.addView(
+                view,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(WindowInsetsCompat.Type.systemBars())
+            }
+            syncBack()
+        }
+
+        override fun onHideCustomView() {
+            leaveFullscreen()
         }
     }
 
