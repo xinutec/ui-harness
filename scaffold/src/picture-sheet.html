@@ -25,11 +25,11 @@
     class="frame"
     #frame
     type="button"
-    [attr.aria-label]="close_up() ? 'show the whole picture' : 'look closer at this picture'"
+    [attr.aria-label]="closeUp() ? 'show the whole picture' : 'look closer at this picture'"
     (pointerdown)="took($event)"
     (pointermove)="drew($event)"
-    (pointerup)="let_go($event)"
-    (pointercancel)="let_go($event)"
+    (pointerup)="letGo($event)"
+    (pointercancel)="letGo($event)"
     (wheel)="rolled($event)"
     (click)="tapped($event)"
   >

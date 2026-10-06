@@ -93,7 +93,7 @@ export class PictureSheet implements OnDestroy {
     return `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
   });
   /** Whether it is magnified at all — the label and the cursor both change. */
-  protected readonly close_up = computed(() => this.view().scale > 1);
+  protected readonly closeUp = computed(() => this.view().scale > 1);
 
   /**
    * The fingers currently on the picture, by the id the browser gives each. A
@@ -155,7 +155,7 @@ export class PictureSheet implements OnDestroy {
    * A page point, as the transform measures: from the middle of the frame, which
    * is where `transform-origin` puts it.
    */
-  private at_point(page: Point): Point {
+  private atPoint(page: Point): Point {
     const box = this.frame()?.nativeElement.getBoundingClientRect();
     if (!box) return { x: 0, y: 0 };
     return { x: page.x - (box.left + box.width / 2), y: page.y - (box.top + box.height / 2) };
@@ -198,7 +198,7 @@ export class PictureSheet implements OnDestroy {
     if (wasFirst && wasSecond && first && second) {
       const gesture = pinched([wasFirst, wasSecond], [first, second]);
       this.view.update((view) =>
-        scaledAbout(view, this.at_point(gesture.at), gesture.by, measures.frame, measures.base),
+        scaledAbout(view, this.atPoint(gesture.at), gesture.by, measures.frame, measures.base),
       );
       return;
     }
@@ -208,7 +208,7 @@ export class PictureSheet implements OnDestroy {
     );
   }
 
-  protected let_go(event: PointerEvent): void {
+  protected letGo(event: PointerEvent): void {
     this.fingers.delete(event.pointerId);
   }
 
@@ -223,7 +223,7 @@ export class PictureSheet implements OnDestroy {
     this.view.update((view) =>
       scaledAbout(
         view,
-        this.at_point({ x: event.clientX, y: event.clientY }),
+        this.atPoint({ x: event.clientX, y: event.clientY }),
         Math.exp(-event.deltaY / WHEEL),
         measures.frame,
         measures.base,
@@ -242,7 +242,7 @@ export class PictureSheet implements OnDestroy {
     // A keyboard `click` reports the element's corner; the centre is what "look
     // closer" means with no place to look at.
     const at =
-      event.detail === 0 ? { x: 0, y: 0 } : this.at_point({ x: event.clientX, y: event.clientY });
+      event.detail === 0 ? { x: 0, y: 0 } : this.atPoint({ x: event.clientX, y: event.clientY });
     this.view.update((view) => toggled(view, at, measures.frame, measures.base));
   }
 

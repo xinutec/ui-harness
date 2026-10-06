@@ -90,7 +90,7 @@ export declare class PictureSheet implements OnDestroy {
   /** What the template puts on the `img`. */
   protected readonly drawn: import("@angular/core").Signal<string>;
   /** Whether it is magnified at all — the label and the cursor both change. */
-  protected readonly close_up: import("@angular/core").Signal<boolean>;
+  protected readonly closeUp: import("@angular/core").Signal<boolean>;
   /**
    * The fingers currently on the picture, by the id the browser gives each. A
    * `Map`: a third finger mid-pinch, or a pointer whose `up` never arrives, are
@@ -114,7 +114,7 @@ export declare class PictureSheet implements OnDestroy {
    * A page point, as the transform measures: from the middle of the frame, which
    * is where `transform-origin` puts it.
    */
-  private at_point;
+  private atPoint;
   /** A picture that has arrived is fitted, whatever the last one was doing. */
   protected measured(): void;
   protected took(event: PointerEvent): void;
@@ -125,7 +125,7 @@ export declare class PictureSheet implements OnDestroy {
    * of every pinch.
    */
   protected drew(event: PointerEvent): void;
-  protected let_go(event: PointerEvent): void;
+  protected letGo(event: PointerEvent): void;
   /**
    * The wheel, for the same picture at a desk. `preventDefault`, or the page
    * scrolls behind it.

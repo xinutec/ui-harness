@@ -184,7 +184,7 @@ var PictureSheet = class PictureSheet {
 		const view = this.view();
 		return `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
 	}, ...ngDevMode ? [{ debugName: "drawn" }] : /* istanbul ignore next */ []);
-	close_up = computed(() => this.view().scale > 1, ...ngDevMode ? [{ debugName: "close_up" }] : /* istanbul ignore next */ []);
+	closeUp = computed(() => this.view().scale > 1, ...ngDevMode ? [{ debugName: "closeUp" }] : /* istanbul ignore next */ []);
 	fingers = /* @__PURE__ */ new Map();
 	travelled = false;
 	constructor() {
@@ -227,7 +227,7 @@ var PictureSheet = class PictureSheet {
 			}, size)
 		};
 	}
-	at_point(page) {
+	atPoint(page) {
 		const box = this.frame()?.nativeElement.getBoundingClientRect();
 		if (!box) return {
 			x: 0,
@@ -265,7 +265,7 @@ var PictureSheet = class PictureSheet {
 		const [first, second] = after;
 		if (wasFirst && wasSecond && first && second) {
 			const gesture = pinched([wasFirst, wasSecond], [first, second]);
-			this.view.update((view) => scaledAbout(view, this.at_point(gesture.at), gesture.by, measures.frame, measures.base));
+			this.view.update((view) => scaledAbout(view, this.atPoint(gesture.at), gesture.by, measures.frame, measures.base));
 			return;
 		}
 		this.view.update((view) => moved(view, {
@@ -273,14 +273,14 @@ var PictureSheet = class PictureSheet {
 			y: now.y - was.y
 		}, measures.frame, measures.base));
 	}
-	let_go(event) {
+	letGo(event) {
 		this.fingers.delete(event.pointerId);
 	}
 	rolled(event) {
 		const measures = this.measures();
 		if (!measures) return;
 		event.preventDefault();
-		this.view.update((view) => scaledAbout(view, this.at_point({
+		this.view.update((view) => scaledAbout(view, this.atPoint({
 			x: event.clientX,
 			y: event.clientY
 		}), Math.exp(-event.deltaY / WHEEL), measures.frame, measures.base));
@@ -292,7 +292,7 @@ var PictureSheet = class PictureSheet {
 		const at = event.detail === 0 ? {
 			x: 0,
 			y: 0
-		} : this.at_point({
+		} : this.atPoint({
 			x: event.clientX,
 			y: event.clientY
 		});
@@ -330,7 +330,7 @@ var PictureSheet = class PictureSheet {
 			isSignal: true
 		}],
 		ngImport: i0,
-		template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"close_up() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"let_go($event)\"\n    (pointercancel)=\"let_go($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
+		template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"closeUp() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"letGo($event)\"\n    (pointercancel)=\"letGo($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
 		styles: ["ui-picture-sheet{display:flex;flex-direction:column;height:100%;min-height:0}ui-picture-sheet .what{flex:0 0 auto;display:flex;align-items:center;gap:.5rem}ui-picture-sheet .where{font:var(--mat-sys-body-small);color:var(--mat-sys-on-surface-variant);flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;direction:rtl;text-align:left;text-overflow:ellipsis}ui-picture-sheet .trouble{display:flex;align-items:center;gap:.5rem;color:var(--mat-sys-error);margin:1rem 0 0}ui-picture-sheet .frame{flex:1 1 auto;min-height:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;cursor:grab}ui-picture-sheet .frame:active{cursor:grabbing}ui-picture-sheet .frame img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}.cdk-overlay-pane.ui-picture-panel{height:100dvh;max-height:100dvh;width:100vw;max-width:100vw}.cdk-overlay-pane.ui-picture-panel .mat-bottom-sheet-container{height:100%;max-height:100%;width:100%;max-width:none;border-radius:0;padding:.5rem .75rem}\n"],
 		dependencies: [
 			{
@@ -396,7 +396,7 @@ i0.ɵɵngDeclareClassMetadata({
 				MatIconModule,
 				MatProgressBarModule
 			],
-			template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"close_up() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"let_go($event)\"\n    (pointercancel)=\"let_go($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
+			template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"closeUp() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"letGo($event)\"\n    (pointercancel)=\"letGo($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
 			styles: ["ui-picture-sheet{display:flex;flex-direction:column;height:100%;min-height:0}ui-picture-sheet .what{flex:0 0 auto;display:flex;align-items:center;gap:.5rem}ui-picture-sheet .where{font:var(--mat-sys-body-small);color:var(--mat-sys-on-surface-variant);flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;direction:rtl;text-align:left;text-overflow:ellipsis}ui-picture-sheet .trouble{display:flex;align-items:center;gap:.5rem;color:var(--mat-sys-error);margin:1rem 0 0}ui-picture-sheet .frame{flex:1 1 auto;min-height:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;cursor:grab}ui-picture-sheet .frame:active{cursor:grabbing}ui-picture-sheet .frame img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}.cdk-overlay-pane.ui-picture-panel{height:100dvh;max-height:100dvh;width:100vw;max-width:100vw}.cdk-overlay-pane.ui-picture-panel .mat-bottom-sheet-container{height:100%;max-height:100%;width:100%;max-width:none;border-radius:0;padding:.5rem .75rem}\n"]
 		}]
 	}],
