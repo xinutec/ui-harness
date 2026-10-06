@@ -1,17 +1,19 @@
 import { Location, NgTemplateOutlet } from "@angular/common";
 import * as i0 from "@angular/core";
-import { ChangeDetectionStrategy, Component, DestroyRef, Directive, Injectable, TemplateRef, effect, inject, input, signal } from "@angular/core";
-import { MatBottomSheet } from "@angular/material/bottom-sheet";
+import { ChangeDetectionStrategy, Component, DestroyRef, Directive, Injectable, TemplateRef, ViewEncapsulation, computed, effect, inject, input, signal, viewChild } from "@angular/core";
+import { MAT_BOTTOM_SHEET_DATA, MatBottomSheet, MatBottomSheetRef } from "@angular/material/bottom-sheet";
 import { MatDialog } from "@angular/material/dialog";
 import { NavigationEnd, Router, RouterLink } from "@angular/router";
-import { toSignal } from "@angular/core/rxjs-interop";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
+import * as i1$1 from "@angular/material/button";
+import { MatButtonModule } from "@angular/material/button";
+import * as i2$1 from "@angular/material/icon";
+import { MatIconModule } from "@angular/material/icon";
+import * as i3 from "@angular/material/progress-bar";
+import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { filter, map, scan } from "rxjs";
 import * as i2 from "@angular/material/badge";
 import { MatBadgeModule } from "@angular/material/badge";
-import * as i3 from "@angular/material/button";
-import { MatButtonModule } from "@angular/material/button";
-import * as i4 from "@angular/material/icon";
-import { MatIconModule } from "@angular/material/icon";
 import * as i5 from "@angular/material/menu";
 import { MatMenuModule } from "@angular/material/menu";
 import * as i1 from "@angular/material/toolbar";
@@ -98,6 +100,347 @@ i0.ɵɵngDeclareClassMetadata({
 	version: "22.2.1",
 	ngImport: i0,
 	type: Dialogs,
+	decorators: [{
+		type: Injectable,
+		args: [{ providedIn: "root" }]
+	}]
+});
+const FIT = {
+	scale: 1,
+	x: 0,
+	y: 0
+};
+const CLOSER = 2.5;
+const clamp = (value, low, high) => {
+	const held = Math.min(Math.max(value, low), high);
+	return held === 0 ? 0 : held;
+};
+function fittedIn(picture, frame) {
+	if (picture.width <= 0 || picture.height <= 0) return {
+		width: 0,
+		height: 0
+	};
+	const scale = Math.min(frame.width / picture.width, frame.height / picture.height, 1);
+	return {
+		width: picture.width * scale,
+		height: picture.height * scale
+	};
+}
+function bounded(view, frame, base) {
+	const scale = clamp(view.scale, 1, 8);
+	const slackX = Math.max(0, (base.width * scale - frame.width) / 2);
+	const slackY = Math.max(0, (base.height * scale - frame.height) / 2);
+	return {
+		scale,
+		x: clamp(view.x, -slackX, slackX),
+		y: clamp(view.y, -slackY, slackY)
+	};
+}
+function scaledAbout(view, at, by, frame, base) {
+	const scale = clamp(view.scale * by, 1, 8);
+	const factor = scale / view.scale;
+	return bounded({
+		scale,
+		x: at.x - (at.x - view.x) * factor,
+		y: at.y - (at.y - view.y) * factor
+	}, frame, base);
+}
+function moved(view, by, frame, base) {
+	return bounded({
+		...view,
+		x: view.x + by.x,
+		y: view.y + by.y
+	}, frame, base);
+}
+function toggled(view, at, frame, base) {
+	if (view.scale > 1) return FIT;
+	return scaledAbout(FIT, at, CLOSER, frame, base);
+}
+function pinched(was, now) {
+	const apart = (pair) => Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y);
+	const middle = (pair) => ({
+		x: (pair[0].x + pair[1].x) / 2,
+		y: (pair[0].y + pair[1].y) / 2
+	});
+	const before = apart(was);
+	return {
+		at: middle(now),
+		by: before > 0 ? apart(now) / before : 1
+	};
+}
+const SLIP = 8;
+const WHEEL = 300;
+var PictureSheet = class PictureSheet {
+	given = inject(MAT_BOTTOM_SHEET_DATA);
+	sheet = inject(MatBottomSheetRef);
+	label = this.given.label;
+	at = signal(void 0, ...ngDevMode ? [{ debugName: "at" }] : /* istanbul ignore next */ []);
+	trouble = signal("", ...ngDevMode ? [{ debugName: "trouble" }] : /* istanbul ignore next */ []);
+	made;
+	frame = viewChild("frame", ...ngDevMode ? [{ debugName: "frame" }] : /* istanbul ignore next */ []);
+	picture = viewChild("picture", ...ngDevMode ? [{ debugName: "picture" }] : /* istanbul ignore next */ []);
+	view = signal(FIT, ...ngDevMode ? [{ debugName: "view" }] : /* istanbul ignore next */ []);
+	drawn = computed(() => {
+		const view = this.view();
+		return `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+	}, ...ngDevMode ? [{ debugName: "drawn" }] : /* istanbul ignore next */ []);
+	close_up = computed(() => this.view().scale > 1, ...ngDevMode ? [{ debugName: "close_up" }] : /* istanbul ignore next */ []);
+	fingers = /* @__PURE__ */ new Map();
+	travelled = false;
+	constructor() {
+		const source = this.given.source;
+		if (typeof source === "string") {
+			this.at.set(source);
+			return;
+		}
+		source.pipe(takeUntilDestroyed()).subscribe({
+			next: (bytes) => {
+				this.made = URL.createObjectURL(bytes);
+				this.at.set(this.made);
+			},
+			error: (err) => void this.explain(err)
+		});
+	}
+	ngOnDestroy() {
+		if (this.made) URL.revokeObjectURL(this.made);
+	}
+	unloadable() {
+		this.trouble.set("This picture could not be loaded.");
+	}
+	close() {
+		this.sheet.dismiss();
+	}
+	measures() {
+		const frame = this.frame()?.nativeElement;
+		const picture = this.picture()?.nativeElement;
+		if (!frame || !picture?.naturalWidth) return void 0;
+		const box = frame.getBoundingClientRect();
+		const size = {
+			width: box.width,
+			height: box.height
+		};
+		return {
+			frame: size,
+			base: fittedIn({
+				width: picture.naturalWidth,
+				height: picture.naturalHeight
+			}, size)
+		};
+	}
+	at_point(page) {
+		const box = this.frame()?.nativeElement.getBoundingClientRect();
+		if (!box) return {
+			x: 0,
+			y: 0
+		};
+		return {
+			x: page.x - (box.left + box.width / 2),
+			y: page.y - (box.top + box.height / 2)
+		};
+	}
+	measured() {
+		this.view.set(FIT);
+	}
+	took(event) {
+		this.frame()?.nativeElement.setPointerCapture(event.pointerId);
+		this.fingers.set(event.pointerId, {
+			x: event.clientX,
+			y: event.clientY
+		});
+		this.travelled = false;
+	}
+	drew(event) {
+		const was = this.fingers.get(event.pointerId);
+		const measures = this.measures();
+		if (!was || !measures) return;
+		const now = {
+			x: event.clientX,
+			y: event.clientY
+		};
+		const before = [...this.fingers.values()];
+		this.fingers.set(event.pointerId, now);
+		const after = [...this.fingers.values()];
+		if (Math.hypot(now.x - was.x, now.y - was.y) > SLIP) this.travelled = true;
+		const [wasFirst, wasSecond] = before;
+		const [first, second] = after;
+		if (wasFirst && wasSecond && first && second) {
+			const gesture = pinched([wasFirst, wasSecond], [first, second]);
+			this.view.update((view) => scaledAbout(view, this.at_point(gesture.at), gesture.by, measures.frame, measures.base));
+			return;
+		}
+		this.view.update((view) => moved(view, {
+			x: now.x - was.x,
+			y: now.y - was.y
+		}, measures.frame, measures.base));
+	}
+	let_go(event) {
+		this.fingers.delete(event.pointerId);
+	}
+	rolled(event) {
+		const measures = this.measures();
+		if (!measures) return;
+		event.preventDefault();
+		this.view.update((view) => scaledAbout(view, this.at_point({
+			x: event.clientX,
+			y: event.clientY
+		}), Math.exp(-event.deltaY / WHEEL), measures.frame, measures.base));
+	}
+	tapped(event) {
+		if (this.travelled) return;
+		const measures = this.measures();
+		if (!measures) return;
+		const at = event.detail === 0 ? {
+			x: 0,
+			y: 0
+		} : this.at_point({
+			x: event.clientX,
+			y: event.clientY
+		});
+		this.view.update((view) => toggled(view, at, measures.frame, measures.base));
+	}
+	async explain(err) {
+		const said = this.given.explain ? await this.given.explain(err) : err instanceof Error ? err.message : String(err);
+		this.trouble.set(said || "This picture could not be loaded.");
+	}
+	static ɵfac = i0.ɵɵngDeclareFactory({
+		minVersion: "12.0.0",
+		version: "22.2.1",
+		ngImport: i0,
+		type: PictureSheet,
+		deps: [],
+		target: i0.ɵɵFactoryTarget.Component
+	});
+	static ɵcmp = i0.ɵɵngDeclareComponent({
+		minVersion: "17.0.0",
+		version: "22.2.1",
+		type: PictureSheet,
+		isStandalone: true,
+		selector: "ui-picture-sheet",
+		viewQueries: [{
+			propertyName: "frame",
+			first: true,
+			predicate: ["frame"],
+			descendants: true,
+			isSignal: true
+		}, {
+			propertyName: "picture",
+			first: true,
+			predicate: ["picture"],
+			descendants: true,
+			isSignal: true
+		}],
+		ngImport: i0,
+		template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"close_up() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"let_go($event)\"\n    (pointercancel)=\"let_go($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
+		styles: ["ui-picture-sheet{display:flex;flex-direction:column;height:100%;min-height:0}ui-picture-sheet .what{flex:0 0 auto;display:flex;align-items:center;gap:.5rem}ui-picture-sheet .where{font:var(--mat-sys-body-small);color:var(--mat-sys-on-surface-variant);flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;direction:rtl;text-align:left;text-overflow:ellipsis}ui-picture-sheet .trouble{display:flex;align-items:center;gap:.5rem;color:var(--mat-sys-error);margin:1rem 0 0}ui-picture-sheet .frame{flex:1 1 auto;min-height:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;cursor:grab}ui-picture-sheet .frame:active{cursor:grabbing}ui-picture-sheet .frame img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}.cdk-overlay-pane.ui-picture-panel{height:100dvh;max-height:100dvh;width:100vw;max-width:100vw}.cdk-overlay-pane.ui-picture-panel .mat-bottom-sheet-container{height:100%;max-height:100%;width:100%;max-width:none;border-radius:0;padding:.5rem .75rem}\n"],
+		dependencies: [
+			{
+				kind: "ngmodule",
+				type: MatButtonModule
+			},
+			{
+				kind: "component",
+				type: i1$1.MatIconButton,
+				selector: "button[mat-icon-button], a[mat-icon-button], button[matIconButton], a[matIconButton]",
+				exportAs: ["matButton", "matAnchor"]
+			},
+			{
+				kind: "ngmodule",
+				type: MatIconModule
+			},
+			{
+				kind: "component",
+				type: i2$1.MatIcon,
+				selector: "mat-icon",
+				inputs: [
+					"color",
+					"inline",
+					"svgIcon",
+					"fontSet",
+					"fontIcon"
+				],
+				exportAs: ["matIcon"]
+			},
+			{
+				kind: "ngmodule",
+				type: MatProgressBarModule
+			},
+			{
+				kind: "component",
+				type: i3.MatProgressBar,
+				selector: "mat-progress-bar",
+				inputs: [
+					"color",
+					"value",
+					"bufferValue",
+					"mode"
+				],
+				outputs: ["animationEnd"],
+				exportAs: ["matProgressBar"]
+			}
+		],
+		encapsulation: i0.ViewEncapsulation.None
+	});
+};
+i0.ɵɵngDeclareClassMetadata({
+	minVersion: "12.0.0",
+	version: "22.2.1",
+	ngImport: i0,
+	type: PictureSheet,
+	decorators: [{
+		type: Component,
+		args: [{
+			selector: "ui-picture-sheet",
+			encapsulation: ViewEncapsulation.None,
+			imports: [
+				MatButtonModule,
+				MatIconModule,
+				MatProgressBarModule
+			],
+			template: "<!-- What it is, cut at the start: the end is what tells pictures apart. -->\n<header class=\"what\">\n  <!-- `<bdi>`, not bare text: the span is `direction: rtl` so the cut falls at the\n       start, and without an isolate the bidi algorithm moves a leading `/` to the\n       other end. -->\n  <span class=\"where\" [title]=\"label\"\n    ><bdi>{{ label }}</bdi></span\n  >\n  <button matIconButton type=\"button\" aria-label=\"close this picture\" (click)=\"close()\">\n    <mat-icon>close</mat-icon>\n  </button>\n</header>\n\n@if (trouble(); as why) {\n  <!-- The app's own sentence, not a broken-image glyph. -->\n  <p class=\"trouble\">\n    <mat-icon>broken_image</mat-icon>\n    {{ why }}\n  </p>\n} @else if (at(); as src) {\n  <!-- A button, so Enter is the same toggle as a tap; the gestures sit on top — see\n       `zoom.ts`. `touch-action: none` in the stylesheet is load-bearing, or the\n       browser keeps the pinch for itself. -->\n  <button\n    class=\"frame\"\n    #frame\n    type=\"button\"\n    [attr.aria-label]=\"close_up() ? 'show the whole picture' : 'look closer at this picture'\"\n    (pointerdown)=\"took($event)\"\n    (pointermove)=\"drew($event)\"\n    (pointerup)=\"let_go($event)\"\n    (pointercancel)=\"let_go($event)\"\n    (wheel)=\"rolled($event)\"\n    (click)=\"tapped($event)\"\n  >\n    <img\n      #picture\n      [src]=\"src\"\n      [alt]=\"'a picture: ' + label\"\n      [style.transform]=\"drawn()\"\n      (load)=\"measured()\"\n      (error)=\"unloadable()\"\n    />\n  </button>\n} @else {\n  <!-- Bytes on their way, which can take seconds. -->\n  <mat-progress-bar mode=\"indeterminate\" />\n}\n",
+			styles: ["ui-picture-sheet{display:flex;flex-direction:column;height:100%;min-height:0}ui-picture-sheet .what{flex:0 0 auto;display:flex;align-items:center;gap:.5rem}ui-picture-sheet .where{font:var(--mat-sys-body-small);color:var(--mat-sys-on-surface-variant);flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;direction:rtl;text-align:left;text-overflow:ellipsis}ui-picture-sheet .trouble{display:flex;align-items:center;gap:.5rem;color:var(--mat-sys-error);margin:1rem 0 0}ui-picture-sheet .frame{flex:1 1 auto;min-height:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;cursor:grab}ui-picture-sheet .frame:active{cursor:grabbing}ui-picture-sheet .frame img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}.cdk-overlay-pane.ui-picture-panel{height:100dvh;max-height:100dvh;width:100vw;max-width:100vw}.cdk-overlay-pane.ui-picture-panel .mat-bottom-sheet-container{height:100%;max-height:100%;width:100%;max-width:none;border-radius:0;padding:.5rem .75rem}\n"]
+		}]
+	}],
+	ctorParameters: () => [],
+	propDecorators: {
+		frame: [{
+			type: i0.ViewChild,
+			args: ["frame", { isSignal: true }]
+		}],
+		picture: [{
+			type: i0.ViewChild,
+			args: ["picture", { isSignal: true }]
+		}]
+	}
+});
+var Pictures = class Pictures {
+	sheets = inject(Sheets);
+	open(picture) {
+		this.sheets.open(PictureSheet, {
+			data: picture,
+			panelClass: "ui-picture-panel"
+		});
+	}
+	static ɵfac = i0.ɵɵngDeclareFactory({
+		minVersion: "12.0.0",
+		version: "22.2.1",
+		ngImport: i0,
+		type: Pictures,
+		deps: [],
+		target: i0.ɵɵFactoryTarget.Injectable
+	});
+	static ɵprov = i0.ɵɵngDeclareInjectable({
+		minVersion: "12.0.0",
+		version: "22.2.1",
+		ngImport: i0,
+		type: Pictures,
+		providedIn: "root"
+	});
+};
+i0.ɵɵngDeclareClassMetadata({
+	minVersion: "12.0.0",
+	version: "22.2.1",
+	ngImport: i0,
+	type: Pictures,
 	decorators: [{
 		type: Injectable,
 		args: [{ providedIn: "root" }]
@@ -341,7 +684,7 @@ var Scaffold = class Scaffold {
 			},
 			{
 				kind: "component",
-				type: i3.MatIconButton,
+				type: i1$1.MatIconButton,
 				selector: "button[mat-icon-button], a[mat-icon-button], button[matIconButton], a[matIconButton]",
 				exportAs: ["matButton", "matAnchor"]
 			},
@@ -351,7 +694,7 @@ var Scaffold = class Scaffold {
 			},
 			{
 				kind: "component",
-				type: i4.MatIcon,
+				type: i2$1.MatIcon,
 				selector: "mat-icon",
 				inputs: [
 					"color",
@@ -446,6 +789,6 @@ i0.ɵɵngDeclareClassMetadata({
 		}]
 	}
 });
-export { Dialogs, Place, Scaffold, ScaffoldActions, Sheets, TOP, UP, declaredUp, resolveUp, scaffoldTitle, wireBack };
+export { Dialogs, PictureSheet, Pictures, Place, Scaffold, ScaffoldActions, Sheets, TOP, UP, declaredUp, resolveUp, scaffoldTitle, wireBack };
 
 //# sourceMappingURL=xinutec-ui-scaffold.mjs.map

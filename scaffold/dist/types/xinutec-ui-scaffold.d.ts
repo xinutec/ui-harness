@@ -52,6 +52,101 @@ type History = Pick<Location, 'go' | 'back' | 'path' | 'getState'>;
 export declare function wireBack(history: History, closed: Observable<unknown>): void;
 /** Whether the entry on top of history is an overlay's. */
 declare function overlayOnTop(history: Pick<History, 'getState'>): boolean;
+/** A picture to look at. */
+interface Picture {
+  /** What it is, at the top: an address or a file name. */
+  readonly label: string;
+  /**
+   * Its bytes: an address an `<img>` can load, or a `Blob` that arrives later —
+   * for bytes that need the app's own request, whose failure it can explain.
+   */
+  readonly source: string | Observable<Blob>;
+  /** Why the `Blob` did not arrive, in the app's words; by default the error's own message. */
+  readonly explain?: (err: unknown) => string | Promise<string>;
+}
+/**
+ * A picture, full screen over the app, to look at closely: pinch, drag, the
+ * wheel, and a tap to go in and back out. Back closes it and only it, through
+ * [[Sheets]]'s history entry.
+ *
+ * `ViewEncapsulation.None`, with every rule scoped to this element or its panel:
+ * the pane and the sheet container it fills are Material's, outside this
+ * component, and an app would otherwise have to style them for it.
+ */
+export declare class PictureSheet implements OnDestroy {
+  private readonly given;
+  private sheet;
+  protected readonly label: string;
+  /** What the picture is drawn from: the address, or a blob URL once the bytes arrived. */
+  protected readonly at: import("@angular/core").WritableSignal<string | undefined>;
+  /** Why there is no picture, in words. */
+  protected readonly trouble: import("@angular/core").WritableSignal<string>;
+  /** A blob URL made here, to give back on close. */
+  private made;
+  private readonly frame;
+  private readonly picture;
+  /** Where the picture is, as a magnification and an offset. See `zoom.ts`. */
+  private readonly view;
+  /** What the template puts on the `img`. */
+  protected readonly drawn: import("@angular/core").Signal<string>;
+  /** Whether it is magnified at all — the label and the cursor both change. */
+  protected readonly close_up: import("@angular/core").Signal<boolean>;
+  /**
+   * The fingers currently on the picture, by the id the browser gives each. A
+   * `Map`: a third finger mid-pinch, or a pointer whose `up` never arrives, are
+   * ordinary, and two fields would leave a stale one behind.
+   */
+  private readonly fingers;
+  /** Whether this gesture has moved far enough to be a drag rather than a tap. */
+  private travelled;
+  constructor();
+  ngOnDestroy(): void;
+  /** An address that would not load: the `<img>` says nothing about why. */
+  protected unloadable(): void;
+  protected close(): void;
+  /**
+   * The frame's size and what the picture is drawn at inside it — read from the
+   * elements every time: the phone rotates, the chrome comes and goes, and the
+   * picture's own size is not known until it has loaded.
+   */
+  private measures;
+  /**
+   * A page point, as the transform measures: from the middle of the frame, which
+   * is where `transform-origin` puts it.
+   */
+  private at_point;
+  /** A picture that has arrived is fitted, whatever the last one was doing. */
+  protected measured(): void;
+  protected took(event: PointerEvent): void;
+  /**
+   * A finger moved: pinch if there is another one down, pan if not. The two
+   * positions of the pair come from the map either side of this update — only one
+   * finger moves per event. A separate copy of the pair loses the first increment
+   * of every pinch.
+   */
+  protected drew(event: PointerEvent): void;
+  protected let_go(event: PointerEvent): void;
+  /**
+   * The wheel, for the same picture at a desk. `preventDefault`, or the page
+   * scrolls behind it.
+   */
+  protected rolled(event: WheelEvent): void;
+  /**
+   * A tap, or Enter on the focused picture: in about that point, or back out. Not
+   * after a drag — a pan ends with a `click`, and the gesture would undo itself.
+   */
+  protected tapped(event: MouseEvent): void;
+  private explain;
+  static ɵfac: i0.ɵɵFactoryDeclaration<PictureSheet, never>;
+  static ɵcmp: i0.ɵɵComponentDeclaration<PictureSheet, "ui-picture-sheet", never, {}, {}, never, never, true, never>;
+}
+/** Opens a [[Picture]] full screen; back closes it. */
+export declare class Pictures {
+  private readonly sheets;
+  open(picture: Picture): void;
+  static ɵfac: i0.ɵɵFactoryDeclaration<Pictures, never>;
+  static ɵprov: i0.ɵɵInjectableDeclaration<any>;
+}
 /**
  * Where up goes from a screen, declared on its route and read by the bar.
  *
@@ -197,4 +292,4 @@ export declare class Scaffold {
     };
   }, {}, never, ["*"], true, never>;
 }
-export type { History, Title, Up, UpDeclaration };
+export type { History, Picture, Title, Up, UpDeclaration };
