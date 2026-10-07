@@ -3,3 +3,4 @@ dist/
 test-results/
 # The scaffold ships its build: see README, "Scaffold".
 !scaffold/dist/
+ui-snapshots/

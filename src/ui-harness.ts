@@ -6,6 +6,12 @@ import { dirname, join } from "node:path";
 // assertions here throw plain Errors; the app's own specs keep using real `expect`.
 import type { Locator, Page, TestInfo } from "@playwright/test";
 
+/** The default noise floors of the layout checks, in px. */
+const OVERLAP_TOL = 1.5;
+const TEXT_MIN_PX = 3;
+const ICON_MIN_PX = 1;
+const OVERFLOW_TOL = 1;
+
 /** A layout assertion failed. Thrown, not `expect`ed — see the import note above. */
 class LayoutError extends Error {
 	constructor(message: string) {
@@ -243,16 +249,19 @@ export async function expectNoTextOverlaps(
 	page: Page,
 	testInfo: TestInfo,
 	rootSel: string | null = null,
-	tol = 1.5,
+	tol = OVERLAP_TOL,
 ): Promise<void> {
 	await leaveSnapshot(page, testInfo);
+	fail(await overlapProblem(page, rootSel, tol));
+}
 
+async function overlapProblem(page: Page, rootSel: string | null, tol: number): Promise<string | null> {
 	const overlaps = await page.evaluate(findTextOverlaps, [rootSel, tol] as [string | null, number]);
-	if (overlaps.length === 0) return;
+	if (overlaps.length === 0) return null;
 	const detail = overlaps
 		.map((p) => `  "${p.a.text}" ∩ "${p.b.text}" — ${p.overlap.w.toFixed(1)}×${p.overlap.h.toFixed(1)}px`)
 		.join("\n");
-	throw new LayoutError(`Text overlaps detected (${overlaps.length}):\n${detail}`);
+	return `Text overlaps detected (${overlaps.length}):\n${detail}`;
 }
 
 /** A line of text whose top or bottom edge is sheared off by an ancestor. */
@@ -438,16 +447,19 @@ export async function expectNoClippedIcons(
 	page: Page,
 	testInfo: TestInfo,
 	rootSel: string | null = null,
-	minPx = 1,
+	minPx = ICON_MIN_PX,
 ): Promise<void> {
 	await leaveSnapshot(page, testInfo);
+	fail(await clippedIconProblem(page, rootSel, minPx));
+}
 
+async function clippedIconProblem(page: Page, rootSel: string | null, minPx: number): Promise<string | null> {
 	const clips = await page.evaluate(findClippedIcons, [rootSel, minPx] as [string | null, number]);
-	if (clips.length === 0) return;
+	if (clips.length === 0) return null;
 	const detail = clips
 		.map((c) => `  ${c.icon || "(icon)"}: ${c.painted}px of a ${c.glyph}px glyph (${c.axis}), inside ${c.inside}`)
 		.join("\n");
-	throw new LayoutError(`Icons squeezed below their glyph and clipped (${clips.length}):\n${detail}`);
+	return `Icons squeezed below their glyph and clipped (${clips.length}):\n${detail}`;
 }
 
 /**
@@ -459,16 +471,19 @@ export async function expectNoClippedText(
 	page: Page,
 	testInfo: TestInfo,
 	rootSel: string | null = null,
-	minPx = 3,
+	minPx = TEXT_MIN_PX,
 ): Promise<void> {
 	await leaveSnapshot(page, testInfo);
+	fail(await clippedTextProblem(page, rootSel, minPx));
+}
 
+async function clippedTextProblem(page: Page, rootSel: string | null, minPx: number): Promise<string | null> {
 	const clips = await page.evaluate(findClippedText, [rootSel, minPx] as [string | null, number]);
-	if (clips.length === 0) return;
+	if (clips.length === 0) return null;
 	const detail = clips
 		.map((c) => `  "${c.text}" — ${c.clippedPx}px off the ${c.edge}, sheared by ${c.by} (can't scroll to it)`)
 		.join("\n");
-	throw new LayoutError(`Text clipped by an overflow edge (${clips.length}):\n${detail}`);
+	return `Text clipped by an overflow edge (${clips.length}):\n${detail}`;
 }
 
 /** An element whose right edge spills past the viewport (or the given root). */
@@ -591,16 +606,24 @@ export async function expectNoHorizontalOverflow(
 	testInfo: TestInfo,
 	rootSel: string | null = null,
 	allow: string[] = [],
-	tol = 1,
+	tol = OVERFLOW_TOL,
 ): Promise<void> {
 	await leaveSnapshot(page, testInfo);
+	fail(await overflowProblem(page, rootSel, allow, tol));
+}
 
+async function overflowProblem(
+	page: Page,
+	rootSel: string | null,
+	allow: string[],
+	tol: number,
+): Promise<string | null> {
 	const { offenders } = await page.evaluate(findHorizontalOverflow, [rootSel, tol, allow] as [
 		string | null,
 		number,
 		string[],
 	]);
-	if (offenders.length === 0) return;
+	if (offenders.length === 0) return null;
 	const detail = offenders
 		.map(
 			(o) =>
@@ -615,9 +638,43 @@ export async function expectNoHorizontalOverflow(
 	const hint = clipped
 		? `\n${clipped} of these are off the LEFT edge — unreachable, and they cause no page scroll to give them away.`
 		: "";
-	throw new LayoutError(
-		`Content outside the viewport at phone width (${offenders.length}):\n${detail}${hint}`,
-	);
+	return `Content outside the viewport at phone width (${offenders.length}):\n${detail}${hint}`;
+}
+
+/** Throws what a check found, if it found anything. */
+function fail(problem: string | null): void {
+	if (problem !== null) throw new LayoutError(problem);
+}
+
+/** Where {@link expectCleanLayout} looks, and what may scroll sideways there. */
+export interface CleanLayoutOptions {
+	/** A container to scope to (an open sheet or dialog); the whole page if absent. */
+	root?: string | null;
+	/** Intended horizontal scrollers, as `expectNoHorizontalOverflow`'s `allow`. */
+	allow?: string[];
+}
+
+/**
+ * The layout checks as one set: overlapping text, clipped text, clipped icons,
+ * horizontal overflow. Each catches what the others cannot, and an app that ran
+ * only some of them shipped what the rest would have caught (messages' unread count,
+ * cut in half by its list row, passed the overlap and overflow checks). Reports
+ * every failing check at once. dev-lint's DL-E2E-LAYOUT-SET requires it wherever a
+ * spec calls one of the four alone.
+ */
+export async function expectCleanLayout(
+	page: Page,
+	testInfo: TestInfo,
+	{ root = null, allow = [] }: CleanLayoutOptions = {},
+): Promise<void> {
+	await leaveSnapshot(page, testInfo);
+	const problems = [
+		await overlapProblem(page, root, OVERLAP_TOL),
+		await clippedTextProblem(page, root, TEXT_MIN_PX),
+		await clippedIconProblem(page, root, ICON_MIN_PX),
+		await overflowProblem(page, root, allow, OVERFLOW_TOL),
+	].filter((p) => p !== null);
+	if (problems.length > 0) throw new LayoutError(problems.join("\n\n"));
 }
 
 /** An interactive control hidden behind another painted element at its centre. */

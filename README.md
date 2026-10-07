@@ -211,6 +211,13 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 
 ## API
 
+- `expectCleanLayout(page, testInfo, { root?, allow? })` — the four layout
+  checks below as one set: overlapping text, clipped text, clipped icons,
+  horizontal overflow, every failure reported at once. Call this; call one of the
+  four alone only as an addition (a page-wide overflow check beside a sheet-scoped
+  set), which dev-lint's `DL-E2E-LAYOUT-SET` enforces. Each check sees what the
+  others cannot: messages ran only overlap and overflow, and an unread count
+  sheared in half by its list row passed both.
 - `expectNoTextOverlaps(page, testInfo, rootSel?, tol?)` — no two pieces of
   painted text share pixels. Glyph-level (`Range.getClientRects()`), rects
   clipped to every overflow-clipping ancestor; same-node fragment pairs skipped.

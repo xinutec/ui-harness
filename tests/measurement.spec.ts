@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  expectCleanLayout,
   expectViewportIsPhone,
   findCanvasContrast,
   findClippedIcons,
@@ -613,4 +614,25 @@ test('the allow-list exempts truncation that IS the design', async ({ page }) =>
   const found = await page.evaluate(findStarvedText, args);
   expect(found.length).toBe(1);
   expect(first(found).by).toBe('span.title');
+});
+
+test('the clean-layout set reports every check that fails, not the first', async ({ page }, testInfo) => {
+  // messages' unread count, sheared by its list row, beside something too wide.
+  await page.setContent(phonePage(`
+    <div style="overflow: hidden; height: 9px; font: 16px sans-serif;">Chopped</div>
+    <div style="width: 2000px; font: 16px sans-serif;">too wide</div>`));
+  const err = await expectCleanLayout(page, testInfo).catch((e: Error) => e);
+  expect(err).toBeInstanceOf(Error);
+  expect((err as Error).message).toContain('Text clipped by an overflow edge (1)');
+  expect((err as Error).message).toContain('Content outside the viewport');
+  expect((err as Error).message).not.toContain('Text overlaps');
+});
+
+test('the clean-layout set scopes to a root and honours the allow-list', async ({ page }, testInfo) => {
+  await page.setContent(phonePage(`
+    <div style="overflow: hidden; height: 9px; font: 16px sans-serif;">Chopped</div>
+    <div class="sheet" style="font: 16px sans-serif;">
+      <div class="strip" style="overflow-x: auto; width: 300px;"><div style="width: 900px;">wide on purpose</div></div>
+    </div>`));
+  await expectCleanLayout(page, testInfo, { root: '.sheet', allow: ['.strip'] });
 });
