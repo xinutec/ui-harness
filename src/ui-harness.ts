@@ -225,13 +225,31 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 }
 
 /**
- * Write a full-page screenshot to a stable, predictable path (pass OR fail) —
- * eyeballing the render is the habit this whole tool exists to make cheap.
- * Playwright's own report dir is wiped on a passing test, so we keep our own
- * copy under ui-snapshots/ (git-ignored). Returns nothing; also attaches it to
- * the test report.
+ * Wait out every finite animation, so a check measures the layout rather than a
+ * frame of a transition: tasks' overflow menu, measured while Material still
+ * scaled it up, read its icon as clipped. Infinite ones (a spinner) never finish.
  */
-async function leaveSnapshot(page: Page, testInfo: TestInfo): Promise<void> {
+async function settle(page: Page): Promise<void> {
+	await page.evaluate(() =>
+		Promise.all(
+			document
+				.getAnimations()
+				.filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+				// dev-lint: allow-ignored-error a cancelled animation is gone: nothing left to wait for
+				.map((a) => a.finished.catch(() => undefined)),
+		),
+	);
+}
+
+/**
+ * Settle the page, then write a full-page screenshot to a stable, predictable
+ * path (pass OR fail) — eyeballing the render is the habit this whole tool exists
+ * to make cheap. Playwright's own report dir is wiped on a passing test, so we
+ * keep our own copy under ui-snapshots/ (git-ignored). Returns nothing; also
+ * attaches it to the test report.
+ */
+async function settleAndSnapshot(page: Page, testInfo: TestInfo): Promise<void> {
+	await settle(page);
 	const slug = testInfo.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
 	const path = join(testInfo.project.testDir, "..", "ui-snapshots", `${slug}.png`);
 	await mkdir(dirname(path), { recursive: true });
@@ -251,7 +269,7 @@ export async function expectNoTextOverlaps(
 	rootSel: string | null = null,
 	tol = OVERLAP_TOL,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	fail(await overlapProblem(page, rootSel, tol));
 }
 
@@ -449,7 +467,7 @@ export async function expectNoClippedIcons(
 	rootSel: string | null = null,
 	minPx = ICON_MIN_PX,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	fail(await clippedIconProblem(page, rootSel, minPx));
 }
 
@@ -473,7 +491,7 @@ export async function expectNoClippedText(
 	rootSel: string | null = null,
 	minPx = TEXT_MIN_PX,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	fail(await clippedTextProblem(page, rootSel, minPx));
 }
 
@@ -608,7 +626,7 @@ export async function expectNoHorizontalOverflow(
 	allow: string[] = [],
 	tol = OVERFLOW_TOL,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	fail(await overflowProblem(page, rootSel, allow, tol));
 }
 
@@ -667,7 +685,7 @@ export async function expectCleanLayout(
 	testInfo: TestInfo,
 	{ root = null, allow = [] }: CleanLayoutOptions = {},
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	const problems = [
 		await overlapProblem(page, root, OVERLAP_TOL),
 		await clippedTextProblem(page, root, TEXT_MIN_PX),
@@ -761,7 +779,7 @@ export async function expectNoOccludedControls(
 	selector = 'button, a[href], [role="button"]',
 	allow: string[] = [],
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 
 	const occluded = await page.evaluate(findOccludedControls, [selector, allow] as [string, string[]]);
 	if (occluded.length === 0) return;
@@ -1009,7 +1027,7 @@ export async function expectCanvasLegible(
 	minRatio = 3,
 	minPainted = 200,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 
 	const measured = await page.evaluate(findCanvasContrast, [selector, 200] as [string, number]);
 	if (measured.length === 0) {
@@ -1130,7 +1148,7 @@ export async function expectNoStarvedText(
 	minVisible = 0.5,
 	minChars = 8,
 ): Promise<void> {
-	await leaveSnapshot(page, testInfo);
+	await settleAndSnapshot(page, testInfo);
 	const starved = await page.evaluate(findStarvedText, [rootSel, minVisible, minChars, allow] as [
 		string | null,
 		number,

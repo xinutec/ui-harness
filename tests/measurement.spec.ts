@@ -636,3 +636,19 @@ test('the clean-layout set scopes to a root and honours the allow-list', async (
     </div>`));
   await expectCleanLayout(page, testInfo, { root: '.sheet', allow: ['.strip'] });
 });
+
+test('the checks measure the settled page, not a frame of an opening animation', async ({ page }, testInfo) => {
+  // tasks' overflow menu, measured while Material still scaled it up from 0.8:
+  // its icon read 22.2px of a 24px glyph. A spinner's infinite animation must not
+  // be waited for.
+  await page.setContent(
+    phonePage(`
+    <style>
+      @keyframes open { from { transform: scale(0.8) } to { transform: none } }
+      @keyframes spin { to { transform: rotate(1turn) } }
+    </style>
+    <div style="animation: open 400ms; font: 16px sans-serif">${matIcon('cancel')} Drop it</div>
+    <div style="animation: spin 1s infinite; width: 10px; height: 10px"></div>`),
+  );
+  await expectCleanLayout(page, testInfo);
+});
