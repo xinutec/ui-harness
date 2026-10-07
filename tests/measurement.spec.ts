@@ -672,3 +672,15 @@ test('does NOT flag text a scroller has clipped, against the overflow:hidden she
   );
   expect(await page.evaluate(findClippedText, [null, 3] as [string | null, number])).toEqual([]);
 });
+
+test('does NOT flag text inside a closed <details>, which is laid out but never painted', async ({ page }) => {
+  // health's Performance panel, closed at the foot of the Day tab: Chrome still
+  // gives its headings rects, straddling the tab body's bottom edge.
+  await page.setContent(
+    phonePage(`
+    <div style="overflow:hidden;height:26px;font:16px/18px sans-serif">
+      <details><summary>Performance</summary><h4 style="margin:0">Window load</h4></details>
+    </div>`),
+  );
+  expect(await page.evaluate(findClippedText, [null, 3] as [string | null, number])).toEqual([]);
+});

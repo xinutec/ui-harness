@@ -145,8 +145,7 @@ export function findTextOverlaps(args: [string | null, number]): OverlapPair[] {
 		if (parent.closest("mat-icon, .material-icons, .material-symbols-outlined, .material-symbols-rounded")) {
 			continue;
 		}
-		const style = getComputedStyle(parent);
-		if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+		if (!parent.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
 		nodeIdx++;
 		const range = document.createRange();
 		range.selectNodeContents(node);
@@ -333,8 +332,9 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 		// Icon-font ligatures paint a single glyph, not readable text (same skip as
 		// the overlap check) — an icon straddling a clip edge isn't a sheared word.
 		if (parent.closest("mat-icon, .material-icons, .material-symbols-outlined, .material-symbols-rounded")) continue;
-		const st = getComputedStyle(parent);
-		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		// Not painted, so not sheared: hidden, transparent, or in a closed <details>
+		// (health's Performance panel, whose headings Chrome still lays out).
+		if (!parent.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
 		nodeIdx++;
 		const range = document.createRange();
 		range.selectNodeContents(node);
@@ -438,7 +438,7 @@ export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
 	const sel = "mat-icon, .material-icons, .material-symbols-outlined, .material-symbols-rounded";
 	for (const el of Array.from(root.querySelectorAll(sel))) {
 		const st = getComputedStyle(el);
-		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
 		// Only a box that CLIPS can hide part of its glyph; `overflow: visible` spills
 		// the icon outside its box, which is ugly but not this defect.
 		if (st.overflowX === "visible" && st.overflowY === "visible") continue;
@@ -1110,7 +1110,7 @@ export function findStarvedText(args: [string | null, number, number, string[]])
 	const out: StarvedText[] = [];
 	for (const el of Array.from(root.querySelectorAll("*"))) {
 		const st = getComputedStyle(el);
-		if (st.visibility === "hidden" || st.display === "none" || st.opacity === "0") continue;
+		if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
 		if (exempt(el)) continue;
 		// Only elements that truncate: ellipsis (or a hard clip) on a single line.
 		// A wrapping element does not hide anything horizontally.
