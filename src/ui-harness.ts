@@ -340,6 +340,11 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 		range.selectNodeContents(node);
 		for (const r of Array.from(range.getClientRects())) {
 			if (r.height < 1) continue;
+			// The part of the line still painted: each clipping ancestor sees only what
+			// the ones inside it left (coach's shell sheared a line its own content
+			// scroller had already clipped, and could scroll back).
+			let top = r.top;
+			let bottom = r.bottom;
 			// Walk clipping ancestors — element only, stopping before body/html: the
 			// viewport "clips" everything below the fold, but that's page scroll, not
 			// a shear.
@@ -360,10 +365,10 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 				const canScrollDown = scrollableY && el.scrollTop < el.scrollHeight - el.clientHeight - 1;
 				// How much of the line still shows inside this ancestor; a line fully
 				// outside is hidden/off-screen, a different concern than a half-cut one.
-				const visible = Math.min(r.bottom, pb.bottom) - Math.max(r.top, pb.top);
-				if (visible < minPx) continue;
-				const topClip = pb.top - r.top; // >0 → line rises above the ancestor's top
-				const botClip = r.bottom - pb.bottom; // >0 → line drops below the bottom
+				const visible = Math.min(bottom, pb.bottom) - Math.max(top, pb.top);
+				if (visible < minPx) break;
+				const topClip = pb.top - top; // >0 → line rises above the ancestor's top
+				const botClip = bottom - pb.bottom; // >0 → line drops below the bottom
 				const flag = (edge: "top" | "bottom", clip: number): void => {
 					const key = `${nodeIdx}:${edge}`;
 					if (seen.has(key)) return;
@@ -372,6 +377,8 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 				};
 				if (topClip > minPx && !canScrollUp) flag("top", topClip);
 				if (botClip > minPx && !canScrollDown) flag("bottom", botClip);
+				top = Math.max(top, pb.top);
+				bottom = Math.min(bottom, pb.bottom);
 			}
 		}
 	}

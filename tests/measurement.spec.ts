@@ -652,3 +652,23 @@ test('the checks measure the settled page, not a frame of an opening animation',
   );
   await expectCleanLayout(page, testInfo);
 });
+
+test('does NOT flag text a scroller has clipped, against the overflow:hidden shell around it', async ({
+  page,
+}) => {
+  // coach's shell: a 100dvh `overflow: hidden` column, the content scrolling between
+  // the bars. A line below the content's fold is scrolled out of the content, which
+  // paints none of it, so the shell (whose bottom edge the line straddles, behind
+  // the nav) has nothing to shear.
+  await page.setContent(
+    phonePage(`
+    <div style="display:flex;flex-direction:column;height:200px;overflow:hidden;font:16px sans-serif">
+      <div style="flex:1;min-height:0;overflow-y:auto">
+        <div style="height:190px">top</div>
+        <div>Resting Bulgarian split squat until 15 Oct</div>
+      </div>
+      <nav style="height:50px;flex:none">nav</nav>
+    </div>`),
+  );
+  expect(await page.evaluate(findClippedText, [null, 3] as [string | null, number])).toEqual([]);
+});
