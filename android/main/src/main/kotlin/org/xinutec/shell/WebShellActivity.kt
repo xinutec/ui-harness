@@ -190,6 +190,12 @@ abstract class WebShellActivity : ComponentActivity() {
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
+                // No pinch zoom, in every app: an app's layout is its scale. Said
+                // here, not left to the defaults: life's WebView was found
+                // pinch-zoomable mid-session with the same defaults as the rest.
+                settings.setSupportZoom(false)
+                settings.builtInZoomControls = false
+                settings.displayZoomControls = false
                 // Every app here loads one remote origin over https and nothing
                 // off the device. `allowFileAccess` defaults to *true* below API
                 // 30, and minSdk is 26 — so on an Android 8–10 phone the WebView
