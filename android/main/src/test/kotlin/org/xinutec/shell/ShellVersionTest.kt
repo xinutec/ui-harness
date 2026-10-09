@@ -17,4 +17,13 @@ class ShellVersionTest {
         val once = shellUserAgent("Base", "aaa")
         assertEquals("Base XinutecShell/bbb", shellUserAgent(once, "bbb"))
     }
+
+    @Test
+    fun `the beacon asks for the app's own root, naming the app as referer`() {
+        val b = shellBeacon("https://life.xinutec.org/", "Base XinutecShell/abc")
+        assertEquals("https://life.xinutec.org/", b.url)
+        assertEquals("HEAD", b.method)
+        assertEquals("https://life.xinutec.org/", b.headers["Referer"])
+        assertEquals("Base XinutecShell/abc", b.headers["User-Agent"])
+    }
 }

@@ -198,6 +198,7 @@ abstract class WebShellActivity : ComponentActivity() {
                 settings.displayZoomControls = false
                 settings.userAgentString =
                     shellUserAgent(settings.userAgentString, BuildConfig.SHELL_COMMIT)
+                sendBeacon(shellBeacon(shell.url, settings.userAgentString))
                 // Every app here loads one remote origin over https and nothing
                 // off the device. `allowFileAccess` defaults to *true* below API
                 // 30, and minSdk is 26 — so on an Android 8–10 phone the WebView
@@ -474,6 +475,23 @@ abstract class WebShellActivity : ComponentActivity() {
     }
 
     // ---- setup ----
+
+    /** Off the main thread, once; a failure is dropped, the app does not need it. */
+    private fun sendBeacon(beacon: Beacon) {
+        Thread {
+            try {
+                val conn = java.net.URL(beacon.url).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = beacon.method
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                beacon.headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                conn.responseCode
+                conn.disconnect()
+            } catch (_: java.io.IOException) {
+                // No network now: the next launch reports.
+            }
+        }.start()
+    }
 
     private fun applyWebDebugging() {
         val on =
