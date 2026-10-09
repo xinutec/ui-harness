@@ -8,6 +8,19 @@ plugins {
 // against whatever is checked out, the same roll-forward stance as :latest images.
 group = "org.xinutec"
 
+// The commit this shell is built from, stamped into every app's user agent so
+// fleetwatch can tell a phone running a stale shell. `--dirty` says when it is not
+// a commit at all.
+val shellCommit: String =
+    providers
+        .exec {
+            commandLine("git", "-C", projectDir.path, "describe", "--always", "--dirty", "--abbrev=12")
+            isIgnoreExitValue = true
+        }.standardOutput.asText
+        .get()
+        .trim()
+        .ifEmpty { "unknown" }
+
 android {
     namespace = "org.xinutec.shell"
     compileSdk = 36
@@ -19,6 +32,11 @@ android {
         // The floor across the consuming apps: on Android 8+ the system WebView is
         // Chromium, so an Angular app renders as it does in Chrome.
         minSdk = 26
+        buildConfigField("String", "SHELL_COMMIT", "\"$shellCommit\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

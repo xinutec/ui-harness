@@ -196,6 +196,8 @@ abstract class WebShellActivity : ComponentActivity() {
                 settings.setSupportZoom(false)
                 settings.builtInZoomControls = false
                 settings.displayZoomControls = false
+                settings.userAgentString =
+                    shellUserAgent(settings.userAgentString, BuildConfig.SHELL_COMMIT)
                 // Every app here loads one remote origin over https and nothing
                 // off the device. `allowFileAccess` defaults to *true* below API
                 // 30, and minSdk is 26 — so on an Android 8–10 phone the WebView
