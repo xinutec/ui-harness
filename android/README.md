@@ -117,3 +117,16 @@ nix develop .#android --command ./android/gradlew -p android :main:test
 Building any consuming app builds this too, through the composite. The gate
 (`gate.dhall`) runs the library's own unit tests and then builds life against it, so a breaking
 change lands in this repo rather than in eight apps at once.
+
+## Getting a shell change onto the phone
+
+An app's page updates with each deploy; its shell only when its APK is rebuilt. To
+rebuild every wrapper against this checkout and install them on the phone:
+
+```sh
+nix develop ~/Code/recall#android --command scripts/rollout-wrappers.sh <adb-serial>
+```
+
+Each shell reports the commit it was built from (`XinutecShell/<commit>`, sent once
+per launch), and fleetwatch's `phone-shells` collector warns about any app still
+running an older one.
