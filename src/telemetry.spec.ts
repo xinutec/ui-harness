@@ -8,8 +8,9 @@
  * the environment that actually runs it; see life's `telemetry.spec.ts`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { TelemetryCore } from './telemetry.js';
 import { labelFor, oneLine } from './telemetry-label.js';
 
 function el(html: string): Element {
@@ -109,5 +110,47 @@ describe('oneLine', () => {
   it('caps astral characters whole', () => {
     // A naive slice() would cut a surrogate pair and emit a lone half.
     expect(oneLine('🙂'.repeat(300), 4)).toBe('🙂🙂🙂🙂');
+  });
+});
+
+describe('TelemetryCore', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** A fetch that answers `status`, recording each body it is sent. */
+  function stubFetch(status: number): string[] {
+    const sent: string[] = [];
+    vi.stubGlobal('fetch', (_url: string, init: { body: string }) => {
+      sent.push(init.body);
+      return Promise.resolve(new Response(null, { status }));
+    });
+    return sent;
+  }
+
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('stops sending once the server refuses a batch for want of a session', async () => {
+    // A signed-out page posted every five seconds into a 401 (health: 113 in a
+    // morning). Signing in reloads the page, so a new core starts sending again.
+    const sent = stubFetch(401);
+    const core = new TelemetryCore(document);
+    core.record('nav', '/a', null);
+    core.flush(false);
+    await settle();
+    core.record('nav', '/b', null);
+    core.flush(false);
+    await settle();
+    expect(sent).toHaveLength(1);
+  });
+
+  it('keeps sending while the server accepts', async () => {
+    const sent = stubFetch(204);
+    const core = new TelemetryCore(document);
+    core.record('nav', '/a', null);
+    core.flush(false);
+    await settle();
+    core.record('nav', '/b', null);
+    core.flush(false);
+    await settle();
+    expect(sent).toHaveLength(2);
   });
 });

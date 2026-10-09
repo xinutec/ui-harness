@@ -73,10 +73,15 @@ const DEFAULTS = {
  * The corollary, stated so nobody re-adds it: telemetry must never need an
  * interceptor to authenticate. Anything a request genuinely needs goes through
  * `TelemetryConfig.headers`.
+ *
+ * A 401 ends sending for the page: the trace is signed-in only, and a signed-out
+ * page otherwise posted into the refusal every flush. Signing in reloads the
+ * page, which starts a new core.
  */
 export class TelemetryCore {
   private queue: TelemetryEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
+  private refused = false;
 
   constructor(
     private readonly doc: Document,
@@ -112,6 +117,7 @@ export class TelemetryCore {
 
   /** Record one action. `label` is null for a navigation. */
   record(kind: string, path: string, label: string | null): void {
+    if (this.refused) return;
     this.queue.push({ kind, path: oneLine(path), label, at: Date.now() });
     if (this.queue.length >= (this.config.maxQueue ?? DEFAULTS.maxQueue)) this.flush(false);
   }
@@ -123,7 +129,7 @@ export class TelemetryCore {
   }
 
   flush(final: boolean): void {
-    if (this.queue.length === 0) return;
+    if (this.refused || this.queue.length === 0) return;
     const batch = this.queue;
     this.queue = [];
     const body = JSON.stringify(batch);
@@ -145,7 +151,14 @@ export class TelemetryCore {
       body,
       // Lets the request outlive the page on a final flush.
       keepalive: final,
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          this.refused = true;
+          this.queue = [];
+        }
+      })
       // dev-lint: allow-ignored-error a lost trace batch is not the user's problem
-    }).catch(() => undefined);
+      .catch(() => undefined);
   }
 }
