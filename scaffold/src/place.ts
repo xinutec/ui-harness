@@ -56,6 +56,7 @@ export class Place {
 
   readonly title = signal<Title | undefined>(undefined);
   readonly actions = signal<TemplateRef<unknown> | undefined>(undefined);
+  readonly leading = signal<TemplateRef<unknown> | undefined>(undefined);
 }
 
 /** The deepest route's declared up, filled from every parameter on the way down. */
@@ -109,5 +110,25 @@ export class ScaffoldActions implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.place.actions() === this.template) this.place.actions.set(undefined);
+  }
+}
+
+/**
+ * What stands before the screen's name, after up, while the page that declares
+ * it is on view: a conversation's picture, say.
+ *
+ *     <ng-template scaffoldLeading><app-avatar … /></ng-template>
+ */
+@Directive({ selector: 'ng-template[scaffoldLeading]' })
+export class ScaffoldLeading implements OnInit, OnDestroy {
+  private readonly place = inject(Place);
+  private readonly template = inject(TemplateRef<unknown>);
+
+  ngOnInit(): void {
+    this.place.leading.set(this.template);
+  }
+
+  ngOnDestroy(): void {
+    if (this.place.leading() === this.template) this.place.leading.set(undefined);
   }
 }

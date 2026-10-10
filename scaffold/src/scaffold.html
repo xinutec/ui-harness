@@ -30,6 +30,9 @@
         <mat-icon>arrow_back</mat-icon>
       </button>
     }
+    @if (place.leading(); as leading) {
+      <ng-container [ngTemplateOutlet]="leading" />
+    }
     <h1 [class.provisional]="place.title()?.provisional">{{ place.title()?.text }}</h1>
   }
   <span class="spacer"></span>

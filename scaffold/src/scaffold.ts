@@ -14,9 +14,11 @@ import { Place } from './place';
  *
  * On a screen with no up — the root, or a top-level screen the menu reaches —
  * a leading `menu` when the app has one, then the screen's name, or the app's
- * when the screen gives none. On any screen whose route declares up: a leading `arrow_back` to its
- * parent, then the screen's name. Then what the element holds, for the whole
- * app (a keep-awake toggle), then the screen's own actions ([ScaffoldActions]).
+ * when the screen gives none. On any screen whose route declares up: a leading
+ * `arrow_back` to its parent, what the page puts before its name
+ * ([ScaffoldLeading]), then the name. Then what the element holds, for the
+ * whole app (a keep-awake toggle), then the screen's own actions
+ * ([ScaffoldActions]).
  */
 @Component({
   selector: 'ui-scaffold',

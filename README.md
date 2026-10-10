@@ -35,7 +35,8 @@ written.
   screen and any other screen without up (a top-level destination the menu
   reaches) get a leading `menu` (when the app passes one) and the screen's own
   name, else the app's; a screen whose route declares up gets `arrow_back` and
-  its own name. What the
+  its own name, after anything the page puts before it with
+  `<ng-template scaffoldLeading>` (a conversation's picture). What the
   element holds is drawn at the end on every screen; a page adds its own
   actions after it with `<ng-template scaffoldActions>`.
 - **A count on the menu button**: `[menuBadge]="n"` draws Material's badge on

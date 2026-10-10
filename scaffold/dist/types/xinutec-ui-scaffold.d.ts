@@ -223,6 +223,7 @@ export declare class Place {
   readonly opened: Signal<boolean>;
   readonly title: import("@angular/core").WritableSignal<Title | undefined>;
   readonly actions: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
+  readonly leading: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
   static ɵfac: i0.ɵɵFactoryDeclaration<Place, never>;
   static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
@@ -249,13 +250,29 @@ export declare class ScaffoldActions implements OnInit, OnDestroy {
   static ɵdir: i0.ɵɵDirectiveDeclaration<ScaffoldActions, "ng-template[scaffoldActions]", never, {}, {}, never, never, true, never>;
 }
 /**
+ * What stands before the screen's name, after up, while the page that declares
+ * it is on view: a conversation's picture, say.
+ *
+ *     <ng-template scaffoldLeading><app-avatar … /></ng-template>
+ */
+export declare class ScaffoldLeading implements OnInit, OnDestroy {
+  private readonly place;
+  private readonly template;
+  ngOnInit(): void;
+  ngOnDestroy(): void;
+  static ɵfac: i0.ɵɵFactoryDeclaration<ScaffoldLeading, never>;
+  static ɵdir: i0.ɵɵDirectiveDeclaration<ScaffoldLeading, "ng-template[scaffoldLeading]", never, {}, {}, never, never, true, never>;
+}
+/**
  * The top bar every app draws, one for the whole app, above the router.
  *
  * On a screen with no up — the root, or a top-level screen the menu reaches —
  * a leading `menu` when the app has one, then the screen's name, or the app's
- * when the screen gives none. On any screen whose route declares up: a leading `arrow_back` to its
- * parent, then the screen's name. Then what the element holds, for the whole
- * app (a keep-awake toggle), then the screen's own actions ([ScaffoldActions]).
+ * when the screen gives none. On any screen whose route declares up: a leading
+ * `arrow_back` to its parent, what the page puts before its name
+ * ([ScaffoldLeading]), then the name. Then what the element holds, for the
+ * whole app (a keep-awake toggle), then the screen's own actions
+ * ([ScaffoldActions]).
  */
 export declare class Scaffold {
   protected readonly place: Place;
