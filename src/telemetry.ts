@@ -153,6 +153,7 @@ export class TelemetryCore {
       keepalive: final,
     })
       .then((res) => {
+        // dev-lint: allow-fetch-response a 401 is the endpoint refusing a signed-out sender; no session state is decided here, and an offline 504 cannot read as one
         if (res.status === 401) {
           this.refused = true;
           this.queue = [];
