@@ -125,8 +125,9 @@ export interface HarnessOptions {
 	timeout?: number;
 	/**
 	 * Committed screenshot baselines. One per name, with no
-	 * `{projectName}/{platform}` suffix: these only ever run on one machine (a
-	 * dev's Mac — CI runs unit tests only, never Playwright).
+	 * `{projectName}/{platform}` suffix: these only ever run on one machine, a
+	 * dev's Mac. An app whose CI runs Playwright takes no screenshots there; a
+	 * Linux render would not match a Mac baseline.
 	 */
 	goldens?: boolean;
 	/** BCP-47 locale to render in. Defaults to `en-GB` — see `phoneConfig`. */
