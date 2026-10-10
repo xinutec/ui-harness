@@ -167,6 +167,13 @@ export function phoneConfig(
 		);
 	}
 
+	// The browser renders in `zone`; the runner computes in whatever zone its
+	// host keeps, which is UTC in CI. A spec that builds an expected date in the
+	// runner (`new Date(y, m, 1)`) and compares it with the app's then disagrees
+	// by the zone offset, and only in CI. Both clocks read the same zone.
+	const zone = options.timezoneId ?? "Europe/London";
+	process.env.TZ = zone;
+
 	return {
 		testDir: "./e2e",
 		reporter: [["list"]],
@@ -225,7 +232,7 @@ export function phoneConfig(
 					...phone,
 					deviceScaleFactor: 1,
 					locale: options.locale ?? "en-GB",
-					timezoneId: options.timezoneId ?? "Europe/London",
+					timezoneId: zone,
 				},
 			},
 		],

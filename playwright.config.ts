@@ -10,6 +10,9 @@ import { defineConfig, devices } from '@playwright/test';
  * measured in a different locale from the consumers would be measuring
  * something else.
  */
+// The runner computes in the zone the browser renders in, as `phoneConfig` pins it.
+process.env.TZ = 'Europe/London';
+
 export default defineConfig({
   testDir: './tests',
   reporter: [['list']],
