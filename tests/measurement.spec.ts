@@ -640,7 +640,8 @@ test('the clean-layout set scopes to a root and honours the allow-list', async (
 test('the checks measure the settled page, not a frame of an opening animation', async ({ page }, testInfo) => {
   // tasks' overflow menu, measured while Material still scaled it up from 0.8:
   // its icon read 22.2px of a 24px glyph. A spinner's infinite animation must not
-  // be waited for.
+  // be waited for. Its margin is room to turn: at 45° a 10px square reaches 2.07px
+  // past its box, off the left edge, and a slow run measures it there.
   await page.setContent(
     phonePage(`
     <style>
@@ -648,7 +649,7 @@ test('the checks measure the settled page, not a frame of an opening animation',
       @keyframes spin { to { transform: rotate(1turn) } }
     </style>
     <div style="animation: open 400ms; font: 16px sans-serif">${matIcon('cancel')} Drop it</div>
-    <div style="animation: spin 1s infinite; width: 10px; height: 10px"></div>`),
+    <div style="animation: spin 1s infinite; margin-left: 4px; width: 10px; height: 10px"></div>`),
   );
   await expectCleanLayout(page, testInfo);
 });
