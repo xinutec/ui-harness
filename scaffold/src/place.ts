@@ -11,10 +11,23 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { type ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
+import {
+  type ActivatedRouteSnapshot,
+  NavigationEnd,
+  NavigationStart,
+  Router,
+  type Event as RouterEvent,
+} from '@angular/router';
 import { filter, map, scan } from 'rxjs';
 
+import { type Depth, type Step, settle } from './depth';
 import { declaredUp, resolveUp, type Up } from './up';
+
+/** Where the walk through history stands, and the navigation under way. */
+interface Walk {
+  readonly depth?: Depth;
+  readonly pending?: Step;
+}
 
 /** A screen's name in the bar, and whether it is a stand-in for one not known yet. */
 export interface Title {
@@ -43,16 +56,45 @@ export class Place {
 
   /**
    * Whether an in-app screen is behind this one, so up may be back. False on
-   * the first screen the app showed: back from it would leave the app.
+   * the first screen the app showed, however it was returned to: back from it
+   * would leave the app, or in a WebView do nothing at all.
    */
   readonly opened: Signal<boolean> = toSignal(
     this.router.events.pipe(
-      filter((event) => event instanceof NavigationEnd),
-      scan((shown) => shown + 1, this.router.navigated ? 1 : 0),
-      map((shown) => shown > 1),
+      filter((event) => event instanceof NavigationStart || event instanceof NavigationEnd),
+      scan(
+        (walk: Walk, event: RouterEvent): Walk => {
+          if (event instanceof NavigationStart) {
+            const extras = this.router.currentNavigation()?.extras;
+            return {
+              depth: walk.depth,
+              pending: {
+                id: event.id,
+                trigger: event.navigationTrigger ?? 'imperative',
+                restored: event.restoredState?.navigationId,
+                replace: extras?.replaceUrl === true || extras?.skipLocationChange === true,
+              },
+            };
+          }
+          // Only the navigation that started: a cancelled one leaves no entry.
+          const { pending } = walk;
+          if (!(event instanceof NavigationEnd) || pending === undefined || pending.id !== event.id) {
+            return walk;
+          }
+          return { depth: settle(walk.depth, pending) };
+        },
+        this.seed(),
+      ),
+      map((walk) => (walk.depth?.current ?? 0) > 0),
     ),
     { initialValue: false },
   );
+
+  /** The screen already on view when this service was made is the first. */
+  private seed(): Walk {
+    const id = this.router.navigated ? this.router.lastSuccessfulNavigation()?.id : undefined;
+    return id === undefined ? {} : { depth: settle(undefined, { id, trigger: 'imperative', replace: false }) };
+  }
 
   readonly title = signal<Title | undefined>(undefined);
   readonly actions = signal<TemplateRef<unknown> | undefined>(undefined);

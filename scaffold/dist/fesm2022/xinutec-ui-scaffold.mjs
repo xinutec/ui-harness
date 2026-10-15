@@ -3,7 +3,7 @@ import * as i0 from "@angular/core";
 import { ChangeDetectionStrategy, Component, DestroyRef, Directive, Injectable, TemplateRef, ViewEncapsulation, computed, effect, inject, input, signal, viewChild } from "@angular/core";
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheet, MatBottomSheetRef } from "@angular/material/bottom-sheet";
 import { MatDialog } from "@angular/material/dialog";
-import { NavigationEnd, Router, RouterLink } from "@angular/router";
+import { NavigationEnd, NavigationStart, Router, RouterLink } from "@angular/router";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import * as i1$1 from "@angular/material/button";
 import { MatButtonModule } from "@angular/material/button";
@@ -446,6 +446,15 @@ i0.ɵɵngDeclareClassMetadata({
 		args: [{ providedIn: "root" }]
 	}]
 });
+function settle(before, step) {
+	const current = before === void 0 ? 0 : step.trigger === "imperative" ? before.current + (step.replace ? 0 : 1) : (step.restored === void 0 ? void 0 : before.byId.get(step.restored)) ?? 0;
+	const byId = new Map(before?.byId);
+	byId.set(step.id, current);
+	return {
+		current,
+		byId
+	};
+}
 const UP = "up";
 const TOP = "top";
 function declaredUp(data) {
@@ -476,7 +485,31 @@ function resolveUp(declared, params, query) {
 var Place = class Place {
 	router = inject(Router);
 	up = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), map(() => upOf(this.router.routerState.snapshot.root))), { initialValue: upOf(this.router.routerState.snapshot.root) });
-	opened = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), scan((shown) => shown + 1, this.router.navigated ? 1 : 0), map((shown) => shown > 1)), { initialValue: false });
+	opened = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationStart || event instanceof NavigationEnd), scan((walk, event) => {
+		if (event instanceof NavigationStart) {
+			const extras = this.router.currentNavigation()?.extras;
+			return {
+				depth: walk.depth,
+				pending: {
+					id: event.id,
+					trigger: event.navigationTrigger ?? "imperative",
+					restored: event.restoredState?.navigationId,
+					replace: extras?.replaceUrl === true || extras?.skipLocationChange === true
+				}
+			};
+		}
+		const { pending } = walk;
+		if (!(event instanceof NavigationEnd) || pending === void 0 || pending.id !== event.id) return walk;
+		return { depth: settle(walk.depth, pending) };
+	}, this.seed()), map((walk) => (walk.depth?.current ?? 0) > 0)), { initialValue: false });
+	seed() {
+		const id = this.router.navigated ? this.router.lastSuccessfulNavigation()?.id : void 0;
+		return id === void 0 ? {} : { depth: settle(void 0, {
+			id,
+			trigger: "imperative",
+			replace: false
+		}) };
+	}
 	title = signal(void 0, ...ngDevMode ? [{ debugName: "title" }] : /* istanbul ignore next */ []);
 	actions = signal(void 0, ...ngDevMode ? [{ debugName: "actions" }] : /* istanbul ignore next */ []);
 	leading = signal(void 0, ...ngDevMode ? [{ debugName: "leading" }] : /* istanbul ignore next */ []);

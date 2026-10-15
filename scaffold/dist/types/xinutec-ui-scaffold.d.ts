@@ -218,9 +218,12 @@ export declare class Place {
   readonly up: Signal<Up | undefined>;
   /**
    * Whether an in-app screen is behind this one, so up may be back. False on
-   * the first screen the app showed: back from it would leave the app.
+   * the first screen the app showed, however it was returned to: back from it
+   * would leave the app, or in a WebView do nothing at all.
    */
   readonly opened: Signal<boolean>;
+  /** The screen already on view when this service was made is the first. */
+  private seed;
   readonly title: import("@angular/core").WritableSignal<Title | undefined>;
   readonly actions: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
   readonly leading: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
