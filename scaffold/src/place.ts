@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import {
   DestroyRef,
   Directive,
@@ -21,6 +22,7 @@ import {
 import { filter, map, scan } from 'rxjs';
 
 import { type Depth, type Step, settle } from './depth';
+import { overlayOnTop } from './history';
 import { declaredUp, resolveUp, type Up } from './up';
 
 /** Where the walk through history stands, and the navigation under way. */
@@ -44,6 +46,7 @@ export interface Title {
 @Injectable({ providedIn: 'root' })
 export class Place {
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
 
   /** Where the arrow goes, or nothing on a screen with no parent: the root. */
   readonly up: Signal<Up | undefined> = toSignal(
@@ -66,13 +69,19 @@ export class Place {
         (walk: Walk, event: RouterEvent): Walk => {
           if (event instanceof NavigationStart) {
             const extras = this.router.currentNavigation()?.extras;
+            // An overlay's entry is an entry the router never made (`wireBack`):
+            // replacing it, as `Sheets.dismissTo` does, leaves the screen one
+            // deeper than the screen under the overlay, as a push would.
+            const replace =
+              extras?.skipLocationChange === true ||
+              (extras?.replaceUrl === true && !overlayOnTop(this.location));
             return {
               depth: walk.depth,
               pending: {
                 id: event.id,
                 trigger: event.navigationTrigger ?? 'imperative',
                 restored: event.restoredState?.navigationId,
-                replace: extras?.replaceUrl === true || extras?.skipLocationChange === true,
+                replace,
               },
             };
           }

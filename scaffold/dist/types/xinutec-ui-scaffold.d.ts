@@ -214,6 +214,7 @@ interface Title {
  */
 export declare class Place {
   private readonly router;
+  private readonly location;
   /** Where the arrow goes, or nothing on a screen with no parent: the root. */
   readonly up: Signal<Up | undefined>;
   /**

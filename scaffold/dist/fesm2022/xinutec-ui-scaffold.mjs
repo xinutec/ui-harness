@@ -484,17 +484,19 @@ function resolveUp(declared, params, query) {
 }
 var Place = class Place {
 	router = inject(Router);
+	location = inject(Location);
 	up = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), map(() => upOf(this.router.routerState.snapshot.root))), { initialValue: upOf(this.router.routerState.snapshot.root) });
 	opened = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationStart || event instanceof NavigationEnd), scan((walk, event) => {
 		if (event instanceof NavigationStart) {
 			const extras = this.router.currentNavigation()?.extras;
+			const replace = extras?.skipLocationChange === true || extras?.replaceUrl === true && !overlayOnTop(this.location);
 			return {
 				depth: walk.depth,
 				pending: {
 					id: event.id,
 					trigger: event.navigationTrigger ?? "imperative",
 					restored: event.restoredState?.navigationId,
-					replace: extras?.replaceUrl === true || extras?.skipLocationChange === true
+					replace
 				}
 			};
 		}
