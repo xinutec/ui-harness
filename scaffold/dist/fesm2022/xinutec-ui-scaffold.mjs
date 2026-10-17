@@ -47,7 +47,7 @@ var Sheets = class Sheets {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Sheets,
 		deps: [],
@@ -55,7 +55,7 @@ var Sheets = class Sheets {
 	});
 	static ɵprov = i0.ɵɵngDeclareInjectable({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Sheets,
 		providedIn: "root"
@@ -63,7 +63,7 @@ var Sheets = class Sheets {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: Sheets,
 	decorators: [{
@@ -81,7 +81,7 @@ var Dialogs = class Dialogs {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Dialogs,
 		deps: [],
@@ -89,7 +89,7 @@ var Dialogs = class Dialogs {
 	});
 	static ɵprov = i0.ɵɵngDeclareInjectable({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Dialogs,
 		providedIn: "root"
@@ -97,7 +97,7 @@ var Dialogs = class Dialogs {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: Dialogs,
 	decorators: [{
@@ -304,7 +304,7 @@ var PictureSheet = class PictureSheet {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: PictureSheet,
 		deps: [],
@@ -312,7 +312,7 @@ var PictureSheet = class PictureSheet {
 	});
 	static ɵcmp = i0.ɵɵngDeclareComponent({
 		minVersion: "17.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		type: PictureSheet,
 		isStandalone: true,
 		selector: "ui-picture-sheet",
@@ -383,7 +383,7 @@ var PictureSheet = class PictureSheet {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: PictureSheet,
 	decorators: [{
@@ -422,7 +422,7 @@ var Pictures = class Pictures {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Pictures,
 		deps: [],
@@ -430,7 +430,7 @@ var Pictures = class Pictures {
 	});
 	static ɵprov = i0.ɵɵngDeclareInjectable({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Pictures,
 		providedIn: "root"
@@ -438,7 +438,7 @@ var Pictures = class Pictures {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: Pictures,
 	decorators: [{
@@ -517,7 +517,7 @@ var Place = class Place {
 	leading = signal(void 0, ...ngDevMode ? [{ debugName: "leading" }] : /* istanbul ignore next */ []);
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Place,
 		deps: [],
@@ -525,7 +525,7 @@ var Place = class Place {
 	});
 	static ɵprov = i0.ɵɵngDeclareInjectable({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Place,
 		providedIn: "root"
@@ -533,7 +533,7 @@ var Place = class Place {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: Place,
 	decorators: [{
@@ -575,7 +575,7 @@ var ScaffoldActions = class ScaffoldActions {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: ScaffoldActions,
 		deps: [],
@@ -583,7 +583,7 @@ var ScaffoldActions = class ScaffoldActions {
 	});
 	static ɵdir = i0.ɵɵngDeclareDirective({
 		minVersion: "14.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		type: ScaffoldActions,
 		isStandalone: true,
 		selector: "ng-template[scaffoldActions]",
@@ -592,7 +592,7 @@ var ScaffoldActions = class ScaffoldActions {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: ScaffoldActions,
 	decorators: [{
@@ -611,7 +611,7 @@ var ScaffoldLeading = class ScaffoldLeading {
 	}
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: ScaffoldLeading,
 		deps: [],
@@ -619,7 +619,7 @@ var ScaffoldLeading = class ScaffoldLeading {
 	});
 	static ɵdir = i0.ɵɵngDeclareDirective({
 		minVersion: "14.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		type: ScaffoldLeading,
 		isStandalone: true,
 		selector: "ng-template[scaffoldLeading]",
@@ -628,7 +628,7 @@ var ScaffoldLeading = class ScaffoldLeading {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: ScaffoldLeading,
 	decorators: [{
@@ -645,7 +645,7 @@ var Scaffold = class Scaffold {
 	menuLabel = input("Menu", ...ngDevMode ? [{ debugName: "menuLabel" }] : /* istanbul ignore next */ []);
 	static ɵfac = i0.ɵɵngDeclareFactory({
 		minVersion: "12.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		ngImport: i0,
 		type: Scaffold,
 		deps: [],
@@ -653,7 +653,7 @@ var Scaffold = class Scaffold {
 	});
 	static ɵcmp = i0.ɵɵngDeclareComponent({
 		minVersion: "17.0.0",
-		version: "22.2.1",
+		version: "22.2.3",
 		type: Scaffold,
 		isStandalone: true,
 		selector: "ui-scaffold",
@@ -805,7 +805,7 @@ var Scaffold = class Scaffold {
 };
 i0.ɵɵngDeclareClassMetadata({
 	minVersion: "12.0.0",
-	version: "22.2.1",
+	version: "22.2.3",
 	ngImport: i0,
 	type: Scaffold,
 	decorators: [{
