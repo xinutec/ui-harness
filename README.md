@@ -38,7 +38,10 @@ written.
   its own name, after anything the page puts before it with
   `<ng-template scaffoldLeading>` (a conversation's picture). What the
   element holds is drawn at the end on every screen; a page adds its own
-  actions after it with `<ng-template scaffoldActions>`.
+  actions after it with `<ng-template scaffoldActions>`. A screen in a mode of
+  its own (messages selected) replaces the whole bar with
+  `<ng-template scaffoldContext>` — Material's contextual action bar — and
+  draws its own close; declare it inside an `@if` on the mode.
 - **A count on the menu button**: `[menuBadge]="n"` draws Material's badge on
   it (hidden at 0), and `[menuLabel]` says it in words, for example
   `'Menu — 2 sync conflicts need attention'`.

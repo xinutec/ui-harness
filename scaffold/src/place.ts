@@ -108,6 +108,7 @@ export class Place {
   readonly title = signal<Title | undefined>(undefined);
   readonly actions = signal<TemplateRef<unknown> | undefined>(undefined);
   readonly leading = signal<TemplateRef<unknown> | undefined>(undefined);
+  readonly context = signal<TemplateRef<unknown> | undefined>(undefined);
 }
 
 /** The deepest route's declared up, filled from every parameter on the way down. */
@@ -181,5 +182,32 @@ export class ScaffoldLeading implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.place.leading() === this.template) this.place.leading.set(undefined);
+  }
+}
+
+/**
+ * The whole bar, while a screen is in a mode of its own — Material's contextual
+ * action bar. Up, name and actions give way to it; the page draws its own close.
+ * Declare it inside an `@if` on the mode, so the bar comes back when it ends:
+ *
+ *     @if (picked().size) {
+ *       <ng-template scaffoldContext>
+ *         <button matIconButton (click)="clear()" aria-label="Stop selecting"><mat-icon>close</mat-icon></button>
+ *         <span class="count">{{ picked().size }} selected</span>
+ *         …
+ *       </ng-template>
+ *     }
+ */
+@Directive({ selector: 'ng-template[scaffoldContext]' })
+export class ScaffoldContext implements OnInit, OnDestroy {
+  private readonly place = inject(Place);
+  private readonly template = inject(TemplateRef<unknown>);
+
+  ngOnInit(): void {
+    this.place.context.set(this.template);
+  }
+
+  ngOnDestroy(): void {
+    if (this.place.context() === this.template) this.place.context.set(undefined);
   }
 }

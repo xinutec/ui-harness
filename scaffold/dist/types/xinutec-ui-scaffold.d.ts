@@ -228,6 +228,7 @@ export declare class Place {
   readonly title: import("@angular/core").WritableSignal<Title | undefined>;
   readonly actions: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
   readonly leading: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
+  readonly context: import("@angular/core").WritableSignal<TemplateRef<unknown> | undefined>;
   static ɵfac: i0.ɵɵFactoryDeclaration<Place, never>;
   static ɵprov: i0.ɵɵInjectableDeclaration<any>;
 }
@@ -268,6 +269,27 @@ export declare class ScaffoldLeading implements OnInit, OnDestroy {
   static ɵdir: i0.ɵɵDirectiveDeclaration<ScaffoldLeading, "ng-template[scaffoldLeading]", never, {}, {}, never, never, true, never>;
 }
 /**
+ * The whole bar, while a screen is in a mode of its own — Material's contextual
+ * action bar. Up, name and actions give way to it; the page draws its own close.
+ * Declare it inside an `@if` on the mode, so the bar comes back when it ends:
+ *
+ *     @if (picked().size) {
+ *       <ng-template scaffoldContext>
+ *         <button matIconButton (click)="clear()" aria-label="Stop selecting"><mat-icon>close</mat-icon></button>
+ *         <span class="count">{{ picked().size }} selected</span>
+ *         …
+ *       </ng-template>
+ *     }
+ */
+export declare class ScaffoldContext implements OnInit, OnDestroy {
+  private readonly place;
+  private readonly template;
+  ngOnInit(): void;
+  ngOnDestroy(): void;
+  static ɵfac: i0.ɵɵFactoryDeclaration<ScaffoldContext, never>;
+  static ɵdir: i0.ɵɵDirectiveDeclaration<ScaffoldContext, "ng-template[scaffoldContext]", never, {}, {}, never, never, true, never>;
+}
+/**
  * The top bar every app draws, one for the whole app, above the router.
  *
  * On a screen with no up — the root, or a top-level screen the menu reaches —
@@ -276,7 +298,8 @@ export declare class ScaffoldLeading implements OnInit, OnDestroy {
  * `arrow_back` to its parent, what the page puts before its name
  * ([ScaffoldLeading]), then the name. Then what the element holds, for the
  * whole app (a keep-awake toggle), then the screen's own actions
- * ([ScaffoldActions]).
+ * ([ScaffoldActions]). A screen in a mode of its own replaces all of that with
+ * its own bar ([ScaffoldContext]).
  */
 export declare class Scaffold {
   protected readonly place: Place;

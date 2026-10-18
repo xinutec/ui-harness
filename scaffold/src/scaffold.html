@@ -1,7 +1,11 @@
 <mat-toolbar>
   @let up = place.up();
-  <!-- The root first: its leading slot is the navigation menu. -->
-  @if (!up) {
+  <!-- A screen in a mode of its own takes the whole bar: Material's contextual
+       action bar, say "3 selected" with a close and a copy. -->
+  @if (place.context(); as context) {
+    <ng-container [ngTemplateOutlet]="context" />
+  } @else if (!up) {
+    <!-- The root: its leading slot is the navigation menu. -->
     @if (menu(); as menu) {
       <!-- A count of what needs attention behind the menu, hidden at 0; the label
            says it in words, since a badge is only seen. -->
@@ -35,9 +39,11 @@
     }
     <h1 [class.provisional]="place.title()?.provisional">{{ place.title()?.text }}</h1>
   }
-  <span class="spacer"></span>
-  <ng-content />
-  @if (place.actions(); as actions) {
-    <ng-container [ngTemplateOutlet]="actions" />
+  @if (!place.context()) {
+    <span class="spacer"></span>
+    <ng-content />
+    @if (place.actions(); as actions) {
+      <ng-container [ngTemplateOutlet]="actions" />
+    }
   }
 </mat-toolbar>

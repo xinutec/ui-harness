@@ -18,7 +18,8 @@ import { Place } from './place';
  * `arrow_back` to its parent, what the page puts before its name
  * ([ScaffoldLeading]), then the name. Then what the element holds, for the
  * whole app (a keep-awake toggle), then the screen's own actions
- * ([ScaffoldActions]).
+ * ([ScaffoldActions]). A screen in a mode of its own replaces all of that with
+ * its own bar ([ScaffoldContext]).
  */
 @Component({
   selector: 'ui-scaffold',
