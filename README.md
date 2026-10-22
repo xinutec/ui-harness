@@ -213,6 +213,27 @@ test('the suite really runs at phone geometry', async ({ page }) => {
 });
 ```
 
+## Every screen, not only the ones a spec opens
+
+`@xinutec/ui-harness/routes` turns an app's route table into the screens to
+render. The table comes from `e2e/routes.json`, which dev-lint writes from the
+app model and keeps current (`nix run <dev-lint>#ui-routes -- src/app/app.routes.ts
+> e2e/routes.json`; DL-E2E-ROUTES-STALE flags it once it drifts):
+
+```ts
+import { routesFrom, screens } from '@xinutec/ui-harness/routes';
+
+for (const { route, url } of screens(routesFrom('e2e/routes.json'), { id: 'sample-id' })) {
+  test(`${route} lays out cleanly`, async ({ page }, testInfo) => {
+    await stubTheApi(page);           // the app's own mocks, so the screen has content
+    await page.goto(url);
+    await expectCleanLayout(page, testInfo);
+  });
+}
+```
+
+A `:param` with no sample is refused by name rather than skipped.
+
 ## API
 
 - `expectCleanLayout(page, testInfo, { root?, allow? })` — the four layout
