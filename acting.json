@@ -1,0 +1,26 @@
+{
+  "ceilings": {
+    "acts": 2,
+    "bootstrap": 0,
+    "by_design": 0,
+    "observer_checks": 0,
+    "observes": 0
+  },
+  "subjects": [
+    {
+      "class": "Acts",
+      "path": "scripts/land-bump.sh",
+      "why": "commits and pushes a harness bump in every consumer: `plan-run deps` territory"
+    },
+    {
+      "class": "Acts",
+      "path": "scripts/rollout-wrappers.sh",
+      "why": "rebuilds and installs every app's wrapper on a phone: the phone-shells plan's target (item 14)"
+    },
+    {
+      "class": "OutOfScope",
+      "path": "scripts/setup-hooks.sh",
+      "why": ""
+    }
+  ]
+}
