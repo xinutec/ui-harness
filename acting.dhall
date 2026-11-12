@@ -14,7 +14,7 @@ let Class = A.Class
 
 in  { ceilings =
         -- acts: each row names what it becomes (automation-model items 13-15)
-      { acts = 2
+      { acts = 1
       , bootstrap = 0
       , by_design = 0
       , observes = 0
@@ -25,10 +25,6 @@ in  { ceilings =
               "scripts/land-bump.sh"
               Class.Acts
               "commits and pushes a harness bump in every consumer: `plan-run deps` territory"
-          , subject
-              "scripts/rollout-wrappers.sh"
-              Class.Acts
-              "rebuilds and installs every app's wrapper on a phone: the phone-shells plan's target (item 14)"
           , subject "scripts/setup-hooks.sh" Class.OutOfScope ""
       ]
     }

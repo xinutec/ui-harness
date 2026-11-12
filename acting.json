@@ -1,6 +1,6 @@
 {
   "ceilings": {
-    "acts": 2,
+    "acts": 1,
     "bootstrap": 0,
     "by_design": 0,
     "observer_checks": 0,
@@ -11,11 +11,6 @@
       "class": "Acts",
       "path": "scripts/land-bump.sh",
       "why": "commits and pushes a harness bump in every consumer: `plan-run deps` territory"
-    },
-    {
-      "class": "Acts",
-      "path": "scripts/rollout-wrappers.sh",
-      "why": "rebuilds and installs every app's wrapper on a phone: the phone-shells plan's target (item 14)"
     },
     {
       "class": "OutOfScope",

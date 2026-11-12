@@ -120,11 +120,13 @@ change lands in this repo rather than in eight apps at once.
 
 ## Getting a shell change onto the phone
 
-An app's page updates with each deploy; its shell only when its APK is rebuilt. To
-rebuild every wrapper against this checkout and install them on the phone:
+An app's page updates with each deploy; its shell only when its APK is rebuilt.
+Every wrapper's versionCode counts this tree's commits, so a shell change committed
+here makes each app on the Pixel 9 stale to xinutec-infra's android plan, which
+rebuilds and installs them all:
 
 ```sh
-nix develop ~/Code/recall#android --command scripts/rollout-wrappers.sh <adb-serial>
+cd ~/Code/xinutec-infra/plan && plan-run android-pixel9 --settings settings.json --apply
 ```
 
 Each shell reports the commit it was built from (`XinutecShell/<commit>`, sent once
