@@ -34,7 +34,7 @@ class LayoutError extends Error {
  *
  * ⚠ Every `find*` below is serialised by `page.evaluate` and re-parsed inside the
  * browser, so it closes over NOTHING from this module — only its `args`. That is why
- * the small `describe(el)` helper is written out again in each rather than hoisted: a
+ * the small `selectorOf(el)` helper is written out again in each rather than hoisted: a
  * shared one is out of scope in the page and throws `ReferenceError` at the first
  * offender it tries to name.
  *
@@ -313,7 +313,7 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 	const [rootSel, minPx] = args;
 	const root = rootSel ? document.querySelector(rootSel) : document.body;
 	if (!root) return [];
-	const describe = (el: Element): string => {
+	const selectorOf = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
 				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
@@ -373,7 +373,7 @@ export function findClippedText(args: [string | null, number]): ClippedText[] {
 					const key = `${nodeIdx}:${edge}`;
 					if (seen.has(key)) return;
 					seen.add(key);
-					out.push({ text, edge, clippedPx: Math.round(clip * 10) / 10, by: describe(p as Element) });
+					out.push({ text, edge, clippedPx: Math.round(clip * 10) / 10, by: selectorOf(p as Element) });
 				};
 				if (topClip > minPx && !canScrollUp) flag("top", topClip);
 				if (botClip > minPx && !canScrollDown) flag("bottom", botClip);
@@ -426,7 +426,7 @@ export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
 	const [rootSel, minPx] = args;
 	const root = rootSel ? document.querySelector(rootSel) : document.body;
 	if (!root) return [];
-	const describe = (el: Element | null): string => {
+	const selectorOf = (el: Element | null): string => {
 		if (!el) return "(detached)";
 		const cls =
 			typeof el.className === "string" && el.className.trim()
@@ -454,7 +454,7 @@ export function findClippedIcons(args: [string | null, number]): ClippedIcon[] {
 				painted: Math.round(painted * 10) / 10,
 				glyph: Math.round(glyph * 10) / 10,
 				axis,
-				inside: describe(el.parentElement),
+				inside: selectorOf(el.parentElement),
 			});
 		};
 		if (st.overflowX !== "visible") flag("width", box.width);
@@ -563,7 +563,7 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 
 	const inAllowedScroller = (el: Element): boolean =>
 		allow.some((sel) => el.closest(sel) !== null);
-	const describe = (el: Element): string => {
+	const selectorOf = (el: Element): string => {
 		const cls = typeof el.className === "string" && el.className.trim()
 			? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
 			: "";
@@ -601,7 +601,7 @@ export function findHorizontalOverflow(args: [string | null, number, string[]]):
 		const [spill, side]: [number, "left" | "right"] =
 			overRight > tol ? [overRight, "right"] : [overLeft, "left"];
 		if (spill <= tol) continue;
-		const sel = describe(el);
+		const sel = selectorOf(el);
 		// One row per (selector, side, rounded-spill) so a stack of nested offenders
 		// that all spill by the same amount collapses to its outermost note.
 		const key = `${sel}@${side}@${Math.round(spill)}`;
@@ -738,7 +738,7 @@ export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 		}
 		return false;
 	};
-	const describe = (el: Element): string => {
+	const selectorOf = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
 				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
@@ -765,11 +765,11 @@ export function findOccludedControls(args: [string, string[]]): Occlusion[] {
 		// Reachable when the topmost element at the centre IS the control or one
 		// of its descendants; anything else painting there occludes it.
 		if (!hit || el.contains(hit)) continue;
-		const sel = describe(el);
-		const key = `${sel}→${describe(hit)}`;
+		const sel = selectorOf(el);
+		const key = `${sel}→${selectorOf(hit)}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
-		out.push({ sel, text: (el.textContent ?? "").trim().slice(0, 40), by: describe(hit) });
+		out.push({ sel, text: (el.textContent ?? "").trim().slice(0, 40), by: selectorOf(hit) });
 	}
 	return out;
 }
@@ -1099,7 +1099,7 @@ export function findStarvedText(args: [string | null, number, number, string[]])
 	const [rootSel, minVisible, minChars, allow] = args;
 	const root = rootSel ? document.querySelector(rootSel) : document.body;
 	if (!root) return [];
-	const describe = (el: Element): string => {
+	const selectorOf = (el: Element): string => {
 		const cls =
 			typeof el.className === "string" && el.className.trim()
 				? `.${el.className.trim().split(/\s+/).slice(0, 2).join(".")}`
@@ -1134,7 +1134,7 @@ export function findStarvedText(args: [string | null, number, number, string[]])
 			shown: text.slice(0, 40),
 			visible,
 			px: { shown, wanted },
-			by: describe(el),
+			by: selectorOf(el),
 		});
 	}
 	return out;
