@@ -50,8 +50,6 @@ type History = Pick<Location, 'go' | 'back' | 'path' | 'getState'>;
  * the same popstate (#1801).
  */
 export declare function wireBack(history: History, closed: Observable<unknown>): void;
-/** Whether the entry on top of history is an overlay's. */
-declare function overlayOnTop(history: Pick<History, 'getState'>): boolean;
 /** A picture to look at. */
 interface Picture {
   /** What it is, at the top: an address or a file name. */
